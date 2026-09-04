@@ -5,3 +5,6 @@ edition = "2021"
 description = "Runtime lifecycle for RACoN services"
 
 [dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
+uuid = { version = "1", features = ["v4"] }
