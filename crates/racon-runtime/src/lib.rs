@@ -3,6 +3,6 @@
 mod lifecycle;
 
 pub use lifecycle::{
-    server_status, start_server, stop_server, Runtime, RuntimeConfig, RuntimeError, RuntimeState,
-    ServerInfo,
+    server_status, start_server, stop_server, RouterContext, Runtime, RuntimeConfig, RuntimeError,
+    RuntimeState, ServerInfo,
 };
