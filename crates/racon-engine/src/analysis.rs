@@ -206,7 +206,6 @@ impl JobState {
     }
 
     fn cancel(&self) -> JobStatus {
-        self.cancellation.cancel();
         let mut data = self
             .data
             .lock()
@@ -215,6 +214,7 @@ impl JobState {
             data.status = JobStatus::CancelRequested;
             data.phase = "CANCEL_REQUESTED";
             data.elapsed_ms = self.elapsed_ms();
+            self.cancellation.cancel();
         }
         data.status
     }
@@ -545,4 +545,77 @@ fn new_analysis_id() -> String {
         "analysis-{timestamp:032x}-{:08x}-{sequence:016x}",
         std::process::id()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{mpsc, Arc, Mutex, Weak};
+    use std::thread;
+    use std::time::{Duration, Instant};
+
+    use racon_core::execution::CancellationToken;
+
+    use super::{AnalysisCounts, AnalysisFailure, JobData, JobState, JobStatus};
+    use crate::AnalysisSession;
+
+    fn running_job() -> Arc<JobState> {
+        Arc::new(JobState {
+            analysis_id: "analysis-cancellation-ordering".to_owned(),
+            session: Weak::<AnalysisSession>::new(),
+            cancellation: CancellationToken::new(),
+            started_at: Instant::now(),
+            data: Mutex::new(JobData {
+                status: JobStatus::Running,
+                phase: "STATE_SPACE_EXPLORATION",
+                elapsed_ms: 0,
+                worker_outcome: None,
+                counts: AnalysisCounts::default(),
+                metadata: None,
+                error: None,
+            }),
+        })
+    }
+
+    #[test]
+    fn cancel_publishes_requested_state_before_signalling_the_worker() {
+        let job = running_job();
+        let data_guard = job
+            .data
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let cancellation = job.cancellation.clone();
+        let cancel_job = Arc::clone(&job);
+        let (started_tx, started_rx) = mpsc::sync_channel(0);
+        let cancel_thread = thread::spawn(move || {
+            started_tx
+                .send(())
+                .expect("test should observe the cancellation thread");
+            cancel_job.cancel()
+        });
+
+        started_rx.recv().expect("cancellation thread should start");
+        let deadline = Instant::now() + Duration::from_millis(500);
+        while !cancellation.is_cancelled() && Instant::now() < deadline {
+            thread::yield_now();
+        }
+        let signalled_while_state_was_locked = cancellation.is_cancelled();
+        assert_eq!(data_guard.status, JobStatus::Running);
+        drop(data_guard);
+
+        let response_status = cancel_thread
+            .join()
+            .expect("cancellation thread should finish");
+        assert!(
+            !signalled_while_state_was_locked,
+            "worker cancellation must not be visible before CANCEL_REQUESTED can be published"
+        );
+        assert_eq!(response_status, JobStatus::CancelRequested);
+        assert!(cancellation.is_cancelled());
+        assert_eq!(job.snapshot().status, JobStatus::CancelRequested);
+
+        job.record_worker_outcome(Err(AnalysisFailure::Cancelled));
+        assert_eq!(job.snapshot().status, JobStatus::CancelRequested);
+        job.finish_after_worker();
+        assert_eq!(job.snapshot().status, JobStatus::Cancelled);
+    }
 }
