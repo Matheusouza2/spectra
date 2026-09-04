@@ -1,5 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+mod properties;
+mod session;
+
+pub use properties::{PropertyDto, PropertySource, PropertyStatus};
+pub use session::{
+    AnalysisSession, LoadSessionResponse, NetSummaryDto, SessionRepository, SourceDto,
+};
+
 /// Version of the public RACoN protocol.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ProtocolVersion {
