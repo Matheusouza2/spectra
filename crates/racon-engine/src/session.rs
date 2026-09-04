@@ -14,6 +14,11 @@ use crate::invariants::{query_invariants, InvariantCache};
 use crate::properties::{properties_from_structural, properties_with_invariants};
 use crate::{InvariantDto, InvariantQuery, InvariantQueryError, PropertyDto};
 
+#[path = "analysis.rs"]
+mod analysis;
+
+use analysis::{AnalysisJobRegistry, AnalysisSnapshot};
+
 static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -131,6 +136,7 @@ impl AnalysisSession {
 #[derive(Debug, Default)]
 pub struct SessionRepository {
     sessions: RwLock<HashMap<String, Arc<AnalysisSession>>>,
+    analyses: AnalysisJobRegistry,
 }
 
 impl SessionRepository {
@@ -149,6 +155,29 @@ impl SessionRepository {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .get(session_id)
             .cloned()
+    }
+
+    pub fn create_state_space_analysis(
+        &self,
+        session: Arc<AnalysisSession>,
+    ) -> Result<String, String> {
+        self.analyses.create(session)
+    }
+
+    pub fn run_state_space_analysis(&self, analysis_id: &str) -> bool {
+        self.analyses.run(analysis_id)
+    }
+
+    pub fn analysis_status(&self, analysis_id: &str) -> Option<AnalysisSnapshot> {
+        self.analyses.snapshot(analysis_id)
+    }
+
+    pub fn cancel_analysis(&self, analysis_id: &str) -> Option<&'static str> {
+        self.analyses.cancel(analysis_id)
+    }
+
+    pub fn fail_analysis(&self, analysis_id: &str, error: impl Into<String>) {
+        self.analyses.fail(analysis_id, error.into());
     }
 }
 

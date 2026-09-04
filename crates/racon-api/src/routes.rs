@@ -9,12 +9,15 @@ use axum::{
     Json, Router,
 };
 use racon_core::execution::{AnalysisConfig, AnalysisContext};
-use racon_engine::{InvariantKind, InvariantQuery, SessionRepository};
+use racon_engine::{
+    InvariantKind, InvariantQuery, PropertyDto, PropertySource, PropertyStatus, SessionRepository,
+};
 use racon_runtime::RouterContext;
 
 use crate::{
-    ApiError, HealthResponse, InvariantsQuery, InvariantsResponse, LoadRequest, PropertiesQuery,
-    PropertiesResponse,
+    AnalysisLifecycleResponse, AnalysisStatusDto, ApiError, HealthResponse, InvariantsQuery,
+    InvariantsResponse, LoadRequest, PropertiesQuery, PropertiesResponse, PropertyResponseDto,
+    StateSpaceMetadata,
 };
 
 #[derive(Clone)]
@@ -37,6 +40,12 @@ pub fn router(state: ApiState) -> Router {
         .route("/v1/nets/load", post(load))
         .route("/v1/sessions/{session_id}/properties", get(properties))
         .route("/v1/sessions/{session_id}/invariants", get(invariants))
+        .route(
+            "/v1/sessions/{session_id}/state-space",
+            post(start_state_space),
+        )
+        .route("/v1/analyses/{analysis_id}/status", get(analysis_status))
+        .route("/v1/analyses/{analysis_id}/cancel", post(cancel_analysis))
         .layer(middleware::from_fn_with_state(state.clone(), authorize));
     Router::new()
         .route("/v1/health", get(health))
@@ -97,12 +106,12 @@ async fn properties(
     if query
         .scope
         .as_deref()
-        .is_some_and(|scope| scope != "structural" && scope != "all")
+        .is_some_and(|scope| scope != "structural" && scope != "behavioral" && scope != "all")
     {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             "INVALID_SCOPE",
-            "scope must be structural or all",
+            "scope must be structural, behavioral or all",
         ));
     }
     let session = state.sessions.get(&session_id).ok_or_else(|| {
@@ -113,13 +122,143 @@ async fn properties(
         )
     })?;
     let scope = query.scope.unwrap_or_else(|| "all".to_owned());
-    let mut values = session.properties();
+    let mut values: Vec<_> = if scope == "behavioral" {
+        Vec::new()
+    } else {
+        session
+            .properties()
+            .into_iter()
+            .map(PropertyResponseDto::available)
+            .collect()
+    };
     if scope == "structural" {
-        values.retain(|property| property.source == racon_engine::PropertySource::Structural);
+        values.retain(|property| property.property.source == PropertySource::Structural);
+    } else {
+        values.push(PropertyResponseDto::state_space_required(PropertyDto {
+            code: "REV".to_owned(),
+            name: "Reversible".to_owned(),
+            status: PropertyStatus::NotComputed,
+            value: None,
+            source: PropertySource::StateSpace,
+            witness: None,
+        }));
     }
     Ok(Json(PropertiesResponse {
         scope,
         properties: values,
+    }))
+}
+
+async fn start_state_space(
+    State(state): State<ApiState>,
+    Path(session_id): Path<String>,
+) -> Result<(StatusCode, Json<AnalysisLifecycleResponse>), ApiError> {
+    let session = state.sessions.get(&session_id).ok_or_else(|| {
+        ApiError::new(
+            StatusCode::NOT_FOUND,
+            "SESSION_NOT_FOUND",
+            format!("Session {session_id} was not found"),
+        )
+    })?;
+    let analysis_id = state
+        .sessions
+        .create_state_space_analysis(session)
+        .map_err(|error| {
+            ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", error)
+        })?;
+
+    let monitor_sessions = Arc::clone(&state.sessions);
+    let monitor_analysis_id = analysis_id.clone();
+    tokio::spawn(async move {
+        let worker_sessions = Arc::clone(&monitor_sessions);
+        let worker_analysis_id = monitor_analysis_id.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            worker_sessions.run_state_space_analysis(&worker_analysis_id)
+        })
+        .await;
+
+        match result {
+            Ok(true) => {}
+            Ok(false) => monitor_sessions.fail_analysis(
+                &monitor_analysis_id,
+                "Analysis disappeared before execution".to_owned(),
+            ),
+            Err(error) => monitor_sessions.fail_analysis(
+                &monitor_analysis_id,
+                format!("State-space worker failed: {error}"),
+            ),
+        }
+    });
+
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(AnalysisLifecycleResponse {
+            analysis_id,
+            status: "RUNNING".to_owned(),
+        }),
+    ))
+}
+
+async fn analysis_status(
+    State(state): State<ApiState>,
+    Path(analysis_id): Path<String>,
+) -> Result<Json<AnalysisStatusDto>, ApiError> {
+    let snapshot = state
+        .sessions
+        .analysis_status(&analysis_id)
+        .ok_or_else(|| {
+            ApiError::new(
+                StatusCode::NOT_FOUND,
+                "ANALYSIS_NOT_FOUND",
+                format!("Analysis {analysis_id} was not found"),
+            )
+        })?;
+    let metadata = snapshot.metadata().map(|metadata| StateSpaceMetadata {
+        kind: metadata.kind().to_owned(),
+        algorithm: metadata.algorithm().to_owned(),
+        exact: metadata.exact(),
+        reduced: metadata.reduced(),
+        reductions: metadata.reductions().to_vec(),
+        nodes: metadata.nodes(),
+        edges: metadata.edges(),
+        omega_nodes: metadata.omega_nodes(),
+        elapsed_ms: metadata.elapsed_ms(),
+        peak_memory: metadata.peak_memory(),
+        completed: metadata.completed(),
+    });
+
+    Ok(Json(AnalysisStatusDto {
+        analysis_id: snapshot.analysis_id().to_owned(),
+        status: snapshot.status().to_owned(),
+        phase: snapshot.phase().to_owned(),
+        states_discovered: snapshot.states_discovered(),
+        states_processed: snapshot.states_processed(),
+        edges_discovered: snapshot.edges_discovered(),
+        frontier_size: snapshot.frontier_size(),
+        omega_nodes: snapshot.omega_nodes(),
+        elapsed_ms: snapshot.elapsed_ms(),
+        metadata,
+        error: snapshot.error().map(str::to_owned),
+    }))
+}
+
+async fn cancel_analysis(
+    State(state): State<ApiState>,
+    Path(analysis_id): Path<String>,
+) -> Result<Json<AnalysisLifecycleResponse>, ApiError> {
+    let status = state
+        .sessions
+        .cancel_analysis(&analysis_id)
+        .ok_or_else(|| {
+            ApiError::new(
+                StatusCode::NOT_FOUND,
+                "ANALYSIS_NOT_FOUND",
+                format!("Analysis {analysis_id} was not found"),
+            )
+        })?;
+    Ok(Json(AnalysisLifecycleResponse {
+        analysis_id,
+        status: status.to_owned(),
     }))
 }
 

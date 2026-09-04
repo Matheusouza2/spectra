@@ -16,12 +16,73 @@ pub struct LoadRequest {
 #[derive(Debug, Clone, Serialize)]
 pub struct PropertiesResponse {
     pub scope: String,
-    pub properties: Vec<PropertyDto>,
+    pub properties: Vec<PropertyResponseDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PropertyResponseDto {
+    #[serde(flatten)]
+    pub property: PropertyDto,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<&'static str>,
+}
+
+impl PropertyResponseDto {
+    pub fn available(property: PropertyDto) -> Self {
+        Self {
+            property,
+            requires: Vec::new(),
+        }
+    }
+
+    pub fn state_space_required(property: PropertyDto) -> Self {
+        Self {
+            property,
+            requires: vec!["STATE_SPACE"],
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct InvariantsResponse {
     pub invariants: Vec<InvariantDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AnalysisLifecycleResponse {
+    pub analysis_id: String,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AnalysisStatusDto {
+    pub analysis_id: String,
+    pub status: String,
+    pub phase: String,
+    pub states_discovered: usize,
+    pub states_processed: usize,
+    pub edges_discovered: usize,
+    pub frontier_size: usize,
+    pub omega_nodes: usize,
+    pub elapsed_ms: u64,
+    pub metadata: Option<StateSpaceMetadata>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StateSpaceMetadata {
+    pub kind: String,
+    pub algorithm: String,
+    pub exact: bool,
+    pub reduced: bool,
+    pub reductions: Vec<String>,
+    pub nodes: usize,
+    pub edges: usize,
+    pub omega_nodes: usize,
+    pub elapsed_ms: u64,
+    pub peak_memory: Option<usize>,
+    pub completed: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
