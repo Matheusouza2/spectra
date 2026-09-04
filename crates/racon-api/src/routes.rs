@@ -160,12 +160,7 @@ async fn start_state_space(
             format!("Session {session_id} was not found"),
         )
     })?;
-    let analysis_id = state
-        .sessions
-        .create_state_space_analysis(session)
-        .map_err(|error| {
-            ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", error)
-        })?;
+    let analysis_id = state.sessions.create_state_space_analysis(session);
 
     let monitor_sessions = Arc::clone(&state.sessions);
     let monitor_analysis_id = analysis_id.clone();
@@ -178,7 +173,7 @@ async fn start_state_space(
         .await;
 
         match result {
-            Ok(true) => {}
+            Ok(true) => monitor_sessions.finish_state_space_analysis(&monitor_analysis_id),
             Ok(false) => monitor_sessions.fail_analysis(
                 &monitor_analysis_id,
                 "Analysis disappeared before execution".to_owned(),

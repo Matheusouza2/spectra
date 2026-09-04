@@ -1,15 +1,14 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex, RwLock, Weak};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use racon_core::execution::{AnalysisConfig, AnalysisContext};
+use racon_core::execution::{AnalysisConfig, AnalysisContext, CancellationToken};
 use racon_coverability::{
     CoverabilityEngine, CoverabilityEngineImpl, CoverabilityError, CoverabilityGraph,
     CoverabilityStrategy,
 };
-use racon_executor::AnalysisExecutor;
 use racon_invariants::{verify_structural_boundedness_certificate, InvariantAnalysisResult};
 use racon_reachability::{
     ReachabilityEngine, ReachabilityEngineImpl, ReachabilityError, ReachabilityGraph,
@@ -23,7 +22,6 @@ static NEXT_ANALYSIS_ID: AtomicU64 = AtomicU64::new(1);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BoundednessDecision {
     ProvedBounded,
-    ProvedUnbounded,
     Unknown,
 }
 
@@ -45,19 +43,12 @@ impl BoundednessDecision {
             Self::Unknown
         }
     }
-
-    fn from_coverability(graph: &CoverabilityGraph) -> Self {
-        match graph.bounded_status() {
-            Some(true) => Self::ProvedBounded,
-            Some(false) => Self::ProvedUnbounded,
-            None => Self::Unknown,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum JobStatus {
     Running,
+    CancelRequested,
     Completed,
     Cancelled,
     Failed,
@@ -67,6 +58,7 @@ impl JobStatus {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Running => "RUNNING",
+            Self::CancelRequested => "CANCEL_REQUESTED",
             Self::Completed => "COMPLETED",
             Self::Cancelled => "CANCELLED",
             Self::Failed => "FAILED",
@@ -74,7 +66,7 @@ impl JobStatus {
     }
 
     const fn is_terminal(self) -> bool {
-        !matches!(self, Self::Running)
+        matches!(self, Self::Completed | Self::Cancelled | Self::Failed)
     }
 }
 
@@ -111,9 +103,9 @@ impl CompletedStateSpace {
         }
     }
 
-    fn metadata(&self, elapsed_ms: u64) -> EngineStateSpaceMetadata {
+    fn into_snapshot(self, elapsed_ms: u64) -> (AnalysisCounts, EngineStateSpaceMetadata) {
         let counts = self.counts();
-        match self {
+        let metadata = match self {
             Self::Reachability(graph) => EngineStateSpaceMetadata {
                 kind: "REACHABILITY",
                 algorithm: "BREADTH_FIRST_SEARCH",
@@ -127,27 +119,21 @@ impl CompletedStateSpace {
                 peak_memory: None,
                 completed: graph.complete,
             },
-            Self::Coverability(graph) => {
-                let decision = BoundednessDecision::from_coverability(graph);
-                EngineStateSpaceMetadata {
-                    kind: if decision == BoundednessDecision::ProvedBounded {
-                        "REACHABILITY"
-                    } else {
-                        "COVERABILITY"
-                    },
-                    algorithm: "KARP_MILLER",
-                    exact: decision == BoundednessDecision::ProvedBounded,
-                    reduced: false,
-                    reductions: Vec::new(),
-                    nodes: counts.states_discovered,
-                    edges: counts.edges_discovered,
-                    omega_nodes: counts.omega_nodes,
-                    elapsed_ms,
-                    peak_memory: None,
-                    completed: true,
-                }
-            }
-        }
+            Self::Coverability(_) => EngineStateSpaceMetadata {
+                kind: "COVERABILITY",
+                algorithm: "KARP_MILLER",
+                exact: false,
+                reduced: false,
+                reductions: Vec::new(),
+                nodes: counts.states_discovered,
+                edges: counts.edges_discovered,
+                omega_nodes: counts.omega_nodes,
+                elapsed_ms,
+                peak_memory: None,
+                completed: true,
+            },
+        };
+        (counts, metadata)
     }
 }
 
@@ -164,36 +150,37 @@ struct JobData {
     status: JobStatus,
     phase: &'static str,
     elapsed_ms: u64,
-    result: Option<CompletedStateSpace>,
+    worker_outcome: Option<Result<CompletedStateSpace, AnalysisFailure>>,
+    counts: AnalysisCounts,
+    metadata: Option<EngineStateSpaceMetadata>,
     error: Option<String>,
 }
 
 struct JobState {
     analysis_id: String,
-    session: Arc<AnalysisSession>,
-    executor: AnalysisExecutor,
-    context: AnalysisContext,
+    session: Weak<AnalysisSession>,
+    cancellation: CancellationToken,
+    started_at: Instant,
     data: Mutex<JobData>,
 }
 
 impl JobState {
-    fn new(analysis_id: String, session: Arc<AnalysisSession>) -> Result<Self, String> {
-        let config = AnalysisConfig::default();
-        let executor = AnalysisExecutor::new(config.clone()).map_err(|error| error.to_string())?;
-        let context = executor.context(config);
-        Ok(Self {
+    fn new(analysis_id: String, session: Arc<AnalysisSession>) -> Self {
+        Self {
             analysis_id,
-            session,
-            executor,
-            context,
+            session: Arc::downgrade(&session),
+            cancellation: CancellationToken::new(),
+            started_at: Instant::now(),
             data: Mutex::new(JobData {
                 status: JobStatus::Running,
                 phase: "STATE_SPACE_EXPLORATION",
                 elapsed_ms: 0,
-                result: None,
+                worker_outcome: None,
+                counts: AnalysisCounts::default(),
+                metadata: None,
                 error: None,
             }),
-        })
+        }
     }
 
     fn snapshot(&self) -> AnalysisSnapshot {
@@ -204,58 +191,74 @@ impl JobState {
         let elapsed_ms = if data.status.is_terminal() {
             data.elapsed_ms
         } else {
-            self.executor.metrics().elapsed_ms()
+            self.elapsed_ms()
         };
-        let counts = data
-            .result
-            .as_ref()
-            .map(CompletedStateSpace::counts)
-            .unwrap_or_default();
-        let metadata = data
-            .result
-            .as_ref()
-            .map(|result| result.metadata(elapsed_ms));
 
         AnalysisSnapshot {
             analysis_id: self.analysis_id.clone(),
             status: data.status,
             phase: data.phase,
-            counts,
+            counts: data.counts,
             elapsed_ms,
-            metadata,
+            metadata: data.metadata.clone(),
             error: data.error.clone(),
         }
     }
 
     fn cancel(&self) -> JobStatus {
-        self.executor.cancel();
+        self.cancellation.cancel();
         let mut data = self
             .data
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         if data.status == JobStatus::Running {
-            data.status = JobStatus::Cancelled;
-            data.phase = "CANCELLED";
-            data.elapsed_ms = self.executor.metrics().elapsed_ms();
+            data.status = JobStatus::CancelRequested;
+            data.phase = "CANCEL_REQUESTED";
+            data.elapsed_ms = self.elapsed_ms();
         }
         data.status
     }
 
-    fn finish(&self, outcome: Result<CompletedStateSpace, AnalysisFailure>) {
+    fn record_worker_outcome(&self, outcome: Result<CompletedStateSpace, AnalysisFailure>) {
         let mut data = self
             .data
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if data.status != JobStatus::Running {
+        if data.status.is_terminal() {
+            return;
+        }
+        data.worker_outcome = Some(outcome);
+    }
+
+    fn finish_after_worker(&self) {
+        let mut data = self
+            .data
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if data.status.is_terminal() {
             return;
         }
 
-        data.elapsed_ms = self.executor.metrics().elapsed_ms();
+        data.elapsed_ms = self.elapsed_ms();
+        if data.status == JobStatus::CancelRequested {
+            data.status = JobStatus::Cancelled;
+            data.phase = "CANCELLED";
+            data.worker_outcome = None;
+            return;
+        }
+
+        let outcome = data.worker_outcome.take().unwrap_or_else(|| {
+            Err(AnalysisFailure::Failed(
+                "State-space worker returned without an outcome".to_owned(),
+            ))
+        });
         match outcome {
             Ok(result) => {
+                let (counts, metadata) = result.into_snapshot(data.elapsed_ms);
                 data.status = JobStatus::Completed;
                 data.phase = "COMPLETED";
-                data.result = Some(result);
+                data.counts = counts;
+                data.metadata = Some(metadata);
             }
             Err(AnalysisFailure::Cancelled) => {
                 data.status = JobStatus::Cancelled;
@@ -270,47 +273,56 @@ impl JobState {
     }
 
     fn run(&self) {
-        if self.context.cancellation.is_cancelled() {
-            self.finish(Err(AnalysisFailure::Cancelled));
+        if self.cancellation.is_cancelled() {
+            self.record_worker_outcome(Err(AnalysisFailure::Cancelled));
             return;
         }
 
-        let outcome = self.compute_state_space();
-        self.finish(outcome);
+        let Some(session) = self.session.upgrade() else {
+            self.record_worker_outcome(Err(AnalysisFailure::Failed(
+                "Analysis session is no longer available".to_owned(),
+            )));
+            return;
+        };
+        let mut context = AnalysisContext::new(AnalysisConfig::default());
+        context.cancellation = self.cancellation.clone();
+        let outcome = self.compute_state_space(&session, &context);
+        self.record_worker_outcome(outcome);
     }
 
-    fn compute_state_space(&self) -> Result<CompletedStateSpace, AnalysisFailure> {
-        let invariants = self
-            .session
+    fn compute_state_space(
+        &self,
+        session: &AnalysisSession,
+        context: &AnalysisContext,
+    ) -> Result<CompletedStateSpace, AnalysisFailure> {
+        let invariants = session
             .invariant_cache
-            .get_or_compute(&self.session.net, &self.context)
+            .get_or_compute(&session.net, context)
             .map_err(|error| {
-                if self.context.cancellation.is_cancelled() {
+                if context.cancellation.is_cancelled() {
                     AnalysisFailure::Cancelled
                 } else {
                     AnalysisFailure::Failed(error.to_string())
                 }
             })?;
-        self.context
+        context
             .check_cancellation()
             .map_err(|_| AnalysisFailure::Cancelled)?;
 
-        match BoundednessDecision::before_exploration(&self.session, &invariants) {
+        match BoundednessDecision::before_exploration(session, &invariants) {
             BoundednessDecision::ProvedBounded => ReachabilityEngineImpl::default()
-                .build_complete(&self.session.net, &self.context)
+                .build_complete(&session.net, context)
                 .map(CompletedStateSpace::Reachability)
                 .map_err(AnalysisFailure::from),
-            BoundednessDecision::ProvedUnbounded | BoundednessDecision::Unknown => {
-                CoverabilityEngineImpl::default()
-                    .build_complete(
-                        &self.session.net,
-                        CoverabilityStrategy::KarpMiller,
-                        &self.context,
-                    )
-                    .map(CompletedStateSpace::Coverability)
-                    .map_err(AnalysisFailure::from)
-            }
+            BoundednessDecision::Unknown => CoverabilityEngineImpl::default()
+                .build_complete(&session.net, CoverabilityStrategy::KarpMiller, context)
+                .map(CompletedStateSpace::Coverability)
+                .map_err(AnalysisFailure::from),
         }
+    }
+
+    fn elapsed_ms(&self) -> u64 {
+        self.started_at.elapsed().as_millis() as u64
     }
 }
 
@@ -357,14 +369,14 @@ impl fmt::Debug for AnalysisJobRegistry {
 }
 
 impl AnalysisJobRegistry {
-    pub(crate) fn create(&self, session: Arc<AnalysisSession>) -> Result<String, String> {
+    pub(crate) fn create(&self, session: Arc<AnalysisSession>) -> String {
         let analysis_id = new_analysis_id();
-        let job = Arc::new(JobState::new(analysis_id.clone(), session)?);
+        let job = Arc::new(JobState::new(analysis_id.clone(), session));
         self.jobs
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .insert(analysis_id.clone(), job);
-        Ok(analysis_id)
+        analysis_id
     }
 
     pub(crate) fn run(&self, analysis_id: &str) -> bool {
@@ -379,13 +391,20 @@ impl AnalysisJobRegistry {
         self.get(analysis_id).map(|job| job.snapshot())
     }
 
+    pub(crate) fn finish_after_worker(&self, analysis_id: &str) {
+        if let Some(job) = self.get(analysis_id) {
+            job.finish_after_worker();
+        }
+    }
+
     pub(crate) fn cancel(&self, analysis_id: &str) -> Option<&'static str> {
         self.get(analysis_id).map(|job| job.cancel().as_str())
     }
 
     pub(crate) fn fail(&self, analysis_id: &str, error: String) {
         if let Some(job) = self.get(analysis_id) {
-            job.finish(Err(AnalysisFailure::Failed(error)));
+            job.record_worker_outcome(Err(AnalysisFailure::Failed(error)));
+            job.finish_after_worker();
         }
     }
 

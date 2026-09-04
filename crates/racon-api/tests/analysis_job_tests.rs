@@ -75,6 +75,24 @@ fn unbounded_counter_model() -> TemporaryMercuryFile {
     )
 }
 
+fn bounded_without_structural_certificate_model() -> TemporaryMercuryFile {
+    TemporaryMercuryFile::new(
+        r#"
+        SPN Model InitiallyDisabledGrowth {
+            place Counter;
+            timedTransition Grow(
+                inputs = [Counter],
+                outputs = [Counter(2)],
+                delay = 0.0
+            );
+        }
+
+        main {
+        }
+        "#,
+    )
+}
+
 fn cancellation_model() -> TemporaryMercuryFile {
     let mut places = String::new();
     let mut transitions = String::new();
@@ -242,6 +260,35 @@ async fn missing_boundedness_certificate_uses_coverability_and_reports_omega() {
 }
 
 #[tokio::test]
+async fn bounded_coverability_result_does_not_claim_reachability_or_exactness() {
+    let app = test_router();
+    let model = bounded_without_structural_certificate_model();
+    let session_id = load_model(&app, &model).await;
+    let analysis_id = start_state_space(&app, &session_id).await;
+
+    let completed = poll_terminal(&app, &analysis_id).await;
+    assert_eq!(completed["status"], "COMPLETED");
+    assert_eq!(completed["metadata"]["kind"], "COVERABILITY");
+    assert_eq!(completed["metadata"]["algorithm"], "KARP_MILLER");
+    assert_eq!(completed["metadata"]["exact"], false);
+    assert_eq!(completed["metadata"]["nodes"], 1);
+    assert_eq!(completed["metadata"]["edges"], 0);
+    assert_eq!(completed["metadata"]["omega_nodes"], 0);
+
+    let (status, repeated) = json_response(
+        &app,
+        request(
+            Method::GET,
+            &format!("/v1/analyses/{analysis_id}/status"),
+            Value::Null,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(repeated["metadata"], completed["metadata"]);
+}
+
+#[tokio::test]
 async fn running_job_can_be_cancelled_and_worker_cannot_overwrite_terminal_status() {
     let app = test_router();
     let model = cancellation_model();
@@ -259,14 +306,24 @@ async fn running_job_can_be_cancelled_and_worker_cannot_overwrite_terminal_statu
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(cancelled["analysis_id"], analysis_id);
-    assert_eq!(cancelled["status"], "CANCELLED");
+    assert_eq!(cancelled["status"], "CANCEL_REQUESTED");
 
-    for _ in 0..100 {
-        tokio::task::yield_now().await;
-    }
     let terminal = poll_terminal(&app, &analysis_id).await;
     assert_eq!(terminal["status"], "CANCELLED");
+    assert_eq!(terminal["phase"], "CANCELLED");
     assert!(terminal["metadata"].is_null());
+
+    let (status, repeated) = json_response(
+        &app,
+        request(
+            Method::GET,
+            &format!("/v1/analyses/{analysis_id}/status"),
+            Value::Null,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(repeated["status"], "CANCELLED");
 }
 
 #[tokio::test]

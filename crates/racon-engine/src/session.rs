@@ -157,10 +157,7 @@ impl SessionRepository {
             .cloned()
     }
 
-    pub fn create_state_space_analysis(
-        &self,
-        session: Arc<AnalysisSession>,
-    ) -> Result<String, String> {
+    pub fn create_state_space_analysis(&self, session: Arc<AnalysisSession>) -> String {
         self.analyses.create(session)
     }
 
@@ -170,6 +167,10 @@ impl SessionRepository {
 
     pub fn analysis_status(&self, analysis_id: &str) -> Option<AnalysisSnapshot> {
         self.analyses.snapshot(analysis_id)
+    }
+
+    pub fn finish_state_space_analysis(&self, analysis_id: &str) {
+        self.analyses.finish_after_worker(analysis_id);
     }
 
     pub fn cancel_analysis(&self, analysis_id: &str) -> Option<&'static str> {
