@@ -1,0 +1,16 @@
+[package]
+name = "racon-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Explicit CLI bootstrap for the RACoN HTTP API"
+
+[[bin]]
+name = "racon"
+path = "src/main.rs"
+
+[dependencies]
+racon-api = { path = "../racon-api" }
+racon-engine = { path = "../racon-engine" }
+racon-runtime = { path = "../racon-runtime" }
+serde_json = "1.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }

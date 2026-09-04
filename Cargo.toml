@@ -13,6 +13,7 @@ members = [
     "crates/racon-engine",
     "crates/racon-runtime",
     "crates/racon-api",
+    "crates/racon-cli",
     "crates/racon-ctl",
     "crates/racon-ctl-dsl",
     "crates/racon-property",
