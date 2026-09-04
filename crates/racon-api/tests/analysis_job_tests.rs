@@ -140,6 +140,51 @@ async fn json_response(app: &Router, request: Request<Body>) -> (StatusCode, Val
     (status, json)
 }
 
+#[tokio::test]
+async fn sse_streams_structured_progress_heartbeat_and_terminal_events() {
+    let app = test_router();
+    let model = cancellation_model();
+    let session_id = load_model(&app, &model).await;
+    let analysis_id = start_state_space(&app, &session_id).await;
+
+    let response = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            &format!("/v1/analyses/{analysis_id}/events"),
+            Value::Null,
+        ))
+        .await
+        .expect("router should answer the SSE request");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get(header::CONTENT_TYPE),
+        Some(&"text/event-stream".parse().unwrap())
+    );
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("SSE body should be readable");
+    let body = String::from_utf8(body.to_vec()).expect("SSE body should be UTF-8");
+    let events: Vec<Value> = body
+        .split("\n\n")
+        .filter_map(|frame| frame.lines().find_map(|line| line.strip_prefix("data: ")))
+        .map(|data| serde_json::from_str(data).expect("SSE data should be JSON"))
+        .collect();
+
+    assert!(events.iter().any(|event| event["type"] == "progress"));
+    assert!(events.iter().any(|event| event["type"] == "heartbeat"));
+    assert!(events
+        .iter()
+        .any(|event| event["type"] == "cancelled" || event["type"] == "completed"));
+    for event in events {
+        assert!(event["analysis_id"].is_string());
+        assert!(event["data"].is_object());
+        assert!(event["data"].get("percentage").is_none());
+        assert!(event["data"].get("eta").is_none());
+    }
+}
+
 async fn load_model(app: &Router, model: &TemporaryMercuryFile) -> String {
     let (status, body) = json_response(
         app,

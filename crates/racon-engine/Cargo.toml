@@ -5,6 +5,7 @@ edition = "2021"
 description = "Analysis orchestration layer for RACoN"
 
 [dependencies]
+tokio = { version = "1", features = ["sync"] }
 racon-core = { path = "../racon-core" }
 racon-parsers = { path = "../racon-parsers" }
 racon-structural = { path = "../racon-structural" }

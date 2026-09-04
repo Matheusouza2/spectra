@@ -14,6 +14,7 @@ use racon_reachability::{
     ReachabilityEngine, ReachabilityEngineImpl, ReachabilityError, ReachabilityGraph,
 };
 use serde::Serialize;
+use tokio::sync::broadcast;
 
 use super::AnalysisSession;
 
@@ -162,15 +163,18 @@ struct JobState {
     cancellation: CancellationToken,
     started_at: Instant,
     data: Mutex<JobData>,
+    events: broadcast::Sender<AnalysisSnapshot>,
 }
 
 impl JobState {
     fn new(analysis_id: String, session: Arc<AnalysisSession>) -> Self {
+        let (events, _) = broadcast::channel(32);
         Self {
             analysis_id,
             session: Arc::downgrade(&session),
             cancellation: CancellationToken::new(),
             started_at: Instant::now(),
+            events,
             data: Mutex::new(JobData {
                 status: JobStatus::Running,
                 phase: "STATE_SPACE_EXPLORATION",
@@ -215,8 +219,28 @@ impl JobState {
             data.phase = "CANCEL_REQUESTED";
             data.elapsed_ms = self.elapsed_ms();
             self.cancellation.cancel();
+            let snapshot = self.snapshot_from_data(&data);
+            drop(data);
+            let _ = self.events.send(snapshot);
+            return JobStatus::CancelRequested;
         }
         data.status
+    }
+
+    fn snapshot_from_data(&self, data: &JobData) -> AnalysisSnapshot {
+        AnalysisSnapshot {
+            analysis_id: self.analysis_id.clone(),
+            status: data.status,
+            phase: data.phase,
+            counts: data.counts,
+            elapsed_ms: if data.status.is_terminal() {
+                data.elapsed_ms
+            } else {
+                self.elapsed_ms()
+            },
+            metadata: data.metadata.clone(),
+            error: data.error.clone(),
+        }
     }
 
     fn record_worker_outcome(&self, outcome: Result<CompletedStateSpace, AnalysisFailure>) {
@@ -244,6 +268,9 @@ impl JobState {
             data.status = JobStatus::Cancelled;
             data.phase = "CANCELLED";
             data.worker_outcome = None;
+            let snapshot = self.snapshot_from_data(&data);
+            drop(data);
+            let _ = self.events.send(snapshot);
             return;
         }
 
@@ -270,6 +297,9 @@ impl JobState {
                 data.error = Some(error);
             }
         }
+        let snapshot = self.snapshot_from_data(&data);
+        drop(data);
+        let _ = self.events.send(snapshot);
     }
 
     fn run(&self) {
@@ -389,6 +419,14 @@ impl AnalysisJobRegistry {
 
     pub(crate) fn snapshot(&self, analysis_id: &str) -> Option<AnalysisSnapshot> {
         self.get(analysis_id).map(|job| job.snapshot())
+    }
+
+    pub(crate) fn subscribe(
+        &self,
+        analysis_id: &str,
+    ) -> Option<(AnalysisSnapshot, broadcast::Receiver<AnalysisSnapshot>)> {
+        self.get(analysis_id)
+            .map(|job| (job.snapshot(), job.events.subscribe()))
     }
 
     pub(crate) fn finish_after_worker(&self, analysis_id: &str) {
@@ -564,6 +602,7 @@ mod tests {
             session: Weak::<AnalysisSession>::new(),
             cancellation: CancellationToken::new(),
             started_at: Instant::now(),
+            events: tokio::sync::broadcast::channel(32).0,
             data: Mutex::new(JobData {
                 status: JobStatus::Running,
                 phase: "STATE_SPACE_EXPLORATION",

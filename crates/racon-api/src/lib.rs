@@ -2,6 +2,7 @@
 
 mod dto;
 mod errors;
+mod events;
 mod routes;
 
 pub use dto::*;

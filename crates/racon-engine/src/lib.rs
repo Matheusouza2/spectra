@@ -10,7 +10,8 @@ pub use invariants::{
 };
 pub use properties::{PropertyDto, PropertySource, PropertyStatus};
 pub use session::{
-    AnalysisSession, LoadSessionResponse, NetSummaryDto, SessionRepository, SourceDto,
+    AnalysisSession, AnalysisSnapshot, LoadSessionResponse, NetSummaryDto, SessionRepository,
+    SourceDto,
 };
 
 /// Version of the public RACoN protocol.

@@ -17,7 +17,8 @@ use crate::{InvariantDto, InvariantQuery, InvariantQueryError, PropertyDto};
 #[path = "analysis.rs"]
 mod analysis;
 
-use analysis::{AnalysisJobRegistry, AnalysisSnapshot};
+use analysis::AnalysisJobRegistry;
+pub use analysis::AnalysisSnapshot;
 
 static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -167,6 +168,16 @@ impl SessionRepository {
 
     pub fn analysis_status(&self, analysis_id: &str) -> Option<AnalysisSnapshot> {
         self.analyses.snapshot(analysis_id)
+    }
+
+    pub fn subscribe_analysis(
+        &self,
+        analysis_id: &str,
+    ) -> Option<(
+        AnalysisSnapshot,
+        tokio::sync::broadcast::Receiver<AnalysisSnapshot>,
+    )> {
+        self.analyses.subscribe(analysis_id)
     }
 
     pub fn finish_state_space_analysis(&self, analysis_id: &str) {

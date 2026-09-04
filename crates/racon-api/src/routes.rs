@@ -4,7 +4,10 @@ use axum::{
     extract::{Path, Query, State},
     http::{header, Request, StatusCode},
     middleware::{self, Next},
-    response::{IntoResponse, Response},
+    response::{
+        sse::{Event, KeepAlive, Sse},
+        IntoResponse, Response,
+    },
     routing::{get, post},
     Json, Router,
 };
@@ -14,6 +17,7 @@ use racon_engine::{
 };
 use racon_runtime::RouterContext;
 
+use crate::events::{event_name, serialize, HEARTBEAT_INTERVAL_MS};
 use crate::{
     AnalysisLifecycleResponse, AnalysisStatusDto, ApiError, HealthResponse, InvariantsQuery,
     InvariantsResponse, LoadRequest, PropertiesQuery, PropertiesResponse, PropertyResponseDto,
@@ -45,6 +49,7 @@ pub fn router(state: ApiState) -> Router {
             post(start_state_space),
         )
         .route("/v1/analyses/{analysis_id}/status", get(analysis_status))
+        .route("/v1/analyses/{analysis_id}/events", get(analysis_events))
         .route("/v1/analyses/{analysis_id}/cancel", post(cancel_analysis))
         .layer(middleware::from_fn_with_state(state.clone(), authorize));
     Router::new()
@@ -235,6 +240,85 @@ async fn analysis_status(
         metadata,
         error: snapshot.error().map(str::to_owned),
     }))
+}
+
+async fn analysis_events(
+    State(state): State<ApiState>,
+    Path(analysis_id): Path<String>,
+) -> Result<Sse<impl futures_core::Stream<Item = Result<Event, std::convert::Infallible>>>, ApiError>
+{
+    let (initial, mut receiver) =
+        state
+            .sessions
+            .subscribe_analysis(&analysis_id)
+            .ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::NOT_FOUND,
+                    "ANALYSIS_NOT_FOUND",
+                    format!("Analysis {analysis_id} was not found"),
+                )
+            })?;
+    let sessions = Arc::clone(&state.sessions);
+    let stream = async_stream::stream! {
+        let initial_name = event_name(&initial);
+        yield Ok(Event::default()
+            .event(initial_name)
+            .data(serde_json::to_string(&serialize(&initial, initial_name))
+                .expect("analysis SSE event should serialize")));
+        if initial.status() != "RUNNING" && initial.status() != "CANCEL_REQUESTED" {
+            return;
+        }
+
+        let mut heartbeat = tokio::time::interval(
+            std::time::Duration::from_millis(HEARTBEAT_INTERVAL_MS),
+        );
+        heartbeat.tick().await;
+        loop {
+            tokio::select! {
+                received = receiver.recv() => match received {
+                    Ok(snapshot) => {
+                        let name = event_name(&snapshot);
+                        yield Ok(Event::default()
+                            .event(name)
+                            .data(serde_json::to_string(&serialize(&snapshot, name))
+                                .expect("analysis SSE event should serialize")));
+                        if snapshot.status() != "RUNNING" && snapshot.status() != "CANCEL_REQUESTED" {
+                            return;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                        if let Some(snapshot) = sessions.analysis_status(&analysis_id) {
+                            let name = event_name(&snapshot);
+                            yield Ok(Event::default()
+                                .event(name)
+                                .data(serde_json::to_string(&serialize(&snapshot, name))
+                                    .expect("analysis SSE event should serialize")));
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                },
+                _ = heartbeat.tick() => {
+                    if let Some(snapshot) = sessions.analysis_status(&analysis_id) {
+                        if snapshot.status() != "RUNNING" && snapshot.status() != "CANCEL_REQUESTED" {
+                            let name = event_name(&snapshot);
+                            yield Ok(Event::default()
+                                .event(name)
+                                .data(serde_json::to_string(&serialize(&snapshot, name))
+                                    .expect("analysis SSE event should serialize")));
+                            return;
+                        }
+                        yield Ok(Event::default()
+                            .event("heartbeat")
+                            .data(serde_json::to_string(&serialize(&snapshot, "heartbeat"))
+                                .expect("analysis SSE event should serialize")));
+                    } else {
+                        return;
+                    }
+                }
+            }
+        }
+    };
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }
 
 async fn cancel_analysis(
