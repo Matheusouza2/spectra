@@ -1,8 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+mod invariants;
 mod properties;
 mod session;
 
+pub use invariants::{
+    InvariantCache, InvariantDto, InvariantInteger, InvariantKind, InvariantQuery,
+    InvariantQueryError, InvariantTermDto,
+};
 pub use properties::{PropertyDto, PropertySource, PropertyStatus};
 pub use session::{
     AnalysisSession, LoadSessionResponse, NetSummaryDto, SessionRepository, SourceDto,

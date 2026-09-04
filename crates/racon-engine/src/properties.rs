@@ -1,3 +1,4 @@
+use racon_invariants::InvariantAnalysisResult;
 use racon_structural::StructuralProperties;
 use serde::{Deserialize, Serialize};
 
@@ -117,4 +118,28 @@ pub(crate) fn properties_from_structural(properties: &StructuralProperties) -> V
         ),
         PropertyDto::structural("ES", "Extended Simple", properties.is_extended_simple),
     ]
+}
+
+pub(crate) fn properties_with_invariants(
+    properties: &[PropertyDto],
+    invariants: Option<&InvariantAnalysisResult>,
+) -> Vec<PropertyDto> {
+    let mut properties = properties.to_vec();
+    let Some(invariants) = invariants else {
+        return properties;
+    };
+
+    if let Some(conservative) = properties
+        .iter_mut()
+        .find(|property| property.code == "CSV")
+    {
+        conservative.status = if invariants.is_conservative {
+            PropertyStatus::True
+        } else {
+            PropertyStatus::False
+        };
+        conservative.value = Some(invariants.is_conservative);
+    }
+
+    properties
 }

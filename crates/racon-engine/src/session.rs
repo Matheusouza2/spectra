@@ -6,13 +6,13 @@ use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use racon_core::{PetriNet, RaconError};
-use racon_invariants::InvariantAnalysisResult;
 use racon_parsers::{MercuryParser, MercuryParserConfig, MercuryParserImpl};
 use racon_structural::{StructuralAnalyzer, StructuralProperties};
 use serde::{Deserialize, Serialize};
 
-use crate::properties::properties_from_structural;
-use crate::PropertyDto;
+use crate::invariants::{query_invariants, InvariantCache};
+use crate::properties::{properties_from_structural, properties_with_invariants};
+use crate::{InvariantDto, InvariantQuery, InvariantQueryError, PropertyDto};
 
 static NEXT_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -45,7 +45,7 @@ pub struct AnalysisSession {
     net: Arc<PetriNet>,
     structural_properties: StructuralProperties,
     properties: Vec<PropertyDto>,
-    invariant_cache: RwLock<Option<InvariantAnalysisResult>>,
+    invariant_cache: InvariantCache,
 }
 
 impl AnalysisSession {
@@ -73,7 +73,7 @@ impl AnalysisSession {
             net,
             structural_properties,
             properties,
-            invariant_cache: RwLock::new(None),
+            invariant_cache: InvariantCache::default(),
         })
     }
 
@@ -93,15 +93,25 @@ impl AnalysisSession {
         &self.structural_properties
     }
 
-    pub fn properties(&self) -> &[PropertyDto] {
-        &self.properties
+    pub fn properties(&self) -> Vec<PropertyDto> {
+        let invariants = self.invariant_cache.cached();
+        properties_with_invariants(&self.properties, invariants.as_deref())
     }
 
     pub fn invariants_cached(&self) -> bool {
-        self.invariant_cache
-            .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .is_some()
+        self.invariant_cache.cached().is_some()
+    }
+
+    pub fn invariant_cache(&self) -> &InvariantCache {
+        &self.invariant_cache
+    }
+
+    pub fn query_invariants(
+        &self,
+        query: &InvariantQuery,
+        context: &racon_core::execution::AnalysisContext,
+    ) -> Result<Vec<InvariantDto>, InvariantQueryError> {
+        query_invariants(&self.net, &self.invariant_cache, query, context)
     }
 
     pub fn load_response(&self) -> LoadSessionResponse {
@@ -113,7 +123,7 @@ impl AnalysisSession {
                 transitions: self.net.transition_count(),
                 arcs: self.net.arcs().len(),
             },
-            properties: self.properties.clone(),
+            properties: self.properties(),
         }
     }
 }
