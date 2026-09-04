@@ -1,0 +1,7 @@
+[package]
+name = "racon-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "Runtime lifecycle for RACoN services"
+
+[dependencies]

@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/racon-core",
+    "crates/racon-parsers",
+    "crates/racon-executor",
+    "crates/racon-gspn",
+    "crates/racon-invariants",
+    "crates/racon-structural",
+    "crates/racon-scc",
+    "crates/racon-reachability",
+    "crates/racon-coverability",
+    "crates/racon-engine",
+    "crates/racon-runtime",
+    "crates/racon-api",
+    "crates/racon-ctl",
+    "crates/racon-ctl-dsl",
+    "crates/racon-property",
+    "crates/racon-reduction",
+    "crates/racon-evidence",
+]
+exclude = ["src-tauri"]

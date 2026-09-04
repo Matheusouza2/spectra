@@ -1,0 +1,15 @@
+[package]
+name = "racon-engine"
+version = "0.1.0"
+edition = "2021"
+description = "Analysis orchestration layer for RACoN"
+
+[dependencies]
+racon-core = { path = "../racon-core" }
+racon-parsers = { path = "../racon-parsers" }
+racon-structural = { path = "../racon-structural" }
+racon-invariants = { path = "../racon-invariants" }
+racon-executor = { path = "../racon-executor" }
+racon-reachability = { path = "../racon-reachability" }
+racon-coverability = { path = "../racon-coverability" }
+serde = { version = "1.0", features = ["derive"] }
