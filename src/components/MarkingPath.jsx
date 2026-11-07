@@ -105,11 +105,13 @@ export default function MarkingPath({ filePath, blocked = false, extended = fals
   }, [filePath]);
 
   const [stubborn, setStubborn] = useReductionFlag('marking', 'stubborn');
+  // The stubborn search is bounded by the node limit, so it may also run on nets the gate rejects.
+  const graphBlocked = blocked && !(stubborn && !extended);
   const parsed = useMemo(() => parseVector(text, placeNames.length), [text, placeNames.length]);
   const edit = (value) => { setText(value); setResult(null); setAlgebraic(null); setCoverage(null); };
 
   const runGraph = useCallback(async () => {
-    if (!filePath || loading || blocked || !parsed.valid) return;
+    if (!filePath || loading || graphBlocked || !parsed.valid) return;
     setLoading(true);
     setResult(null);
     try {
@@ -119,7 +121,7 @@ export default function MarkingPath({ filePath, blocked = false, extended = fals
     } finally {
       setLoading(false);
     }
-  }, [filePath, loading, blocked, parsed, stubborn, extended, addToast, t, tm]);
+  }, [filePath, loading, graphBlocked, parsed, stubborn, extended, addToast, t, tm]);
 
   const runAlgebraic = useCallback(async () => {
     if (!filePath || algebraicLoading || !parsed.valid) return;
@@ -162,7 +164,7 @@ export default function MarkingPath({ filePath, blocked = false, extended = fals
         help={t('verify.marking.help')}
         text={text}
         onChange={edit}
-        onEnter={blocked ? runAlgebraic : runGraph}
+        onEnter={graphBlocked ? runAlgebraic : runGraph}
         names={placeNames}
         placeholder={t('verify.marking.placeholder', { example: placeNames.map((_, i) => (i === 0 ? 1 : 0)).join(', ') })}
         inputRef={inputRef}
@@ -173,7 +175,7 @@ export default function MarkingPath({ filePath, blocked = false, extended = fals
       ]} />
 
       <div className="mp-actions">
-        <button type="button" className="mp-run" onClick={runGraph} disabled={blocked || loading || !parsed.valid}>
+        <button type="button" className="mp-run" onClick={runGraph} disabled={graphBlocked || loading || !parsed.valid}>
           {loading ? t('verify.marking.checking') : t('verify.marking.check')}
         </button>
         <button type="button" className="mp-secondary strong" onClick={runAlgebraic} disabled={algebraicLoading || !parsed.valid}>
@@ -186,7 +188,7 @@ export default function MarkingPath({ filePath, blocked = false, extended = fals
           {t('verify.marking.useInitial')}
         </button>
       </div>
-      <p className="mp-note">{blocked ? t('verify.algebraic.onlyAlgebraic') : t('verify.algebraic.hint')}</p>
+      <p className="mp-note">{graphBlocked ? t('verify.algebraic.onlyAlgebraic') : t('verify.algebraic.hint')}</p>
 
       {extended && <p className="mp-note">{t('verify.coverage.unsupported')}</p>}
       {algebraic && <AlgebraicResult result={algebraic} t={t} />}
