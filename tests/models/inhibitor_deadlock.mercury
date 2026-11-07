@@ -1,0 +1,12 @@
+// PROP-01: the only transition is blocked by an inhibitor arc at M0.
+// As a plain P/T net (inhibitor ignored) t0 would fire; with the inhibitor
+// M0 is a deadlock.
+SPN Model InhibitorDeadlock {
+    place gate(tokens = 1);
+    place src(tokens = 1);
+    place dst;
+    timedTransition t0(inputs = [src], outputs = [dst], inhibitors = [gate], delay = 0.0);
+}
+
+main {
+}

@@ -1,0 +1,12 @@
+{
+  "selectFailed": "Failed to select file: {error}",
+  "success": "Analysis completed successfully",
+  "analysisFailed": "Analysis failed: {error}",
+  "dropPnt": "Drop a .pnt file",
+  "load": "Load",
+  "analyzing": "Analyzing",
+  "analyze": "Analyze",
+  "heroTitle": "Drop a net here or click to browse",
+  "heroSub": "Accepts",
+  "change": "Click to choose another file"
+}

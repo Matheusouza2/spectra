@@ -1,0 +1,14 @@
+{
+  "loading": {
+    "title": "Verificando limitação…",
+    "text": "As consultas são liberadas quando a rede for comprovadamente limitada."
+  },
+  "unbounded": {
+    "title": "Esta rede é não limitada",
+    "text": "As consultas rodam sobre o grafo de alcançabilidade exato, que aqui é infinito. Você pode ver esta página, mas executar consultas está desabilitado."
+  },
+  "unknown": {
+    "title": "Não foi possível comprovar a limitação",
+    "text": "As consultas exigem uma rede comprovadamente limitada, e a análise foi inconclusiva. Executar consultas está desabilitado."
+  }
+}

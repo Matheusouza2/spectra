@@ -1,0 +1,26 @@
+/* ── Petri Net Graph ── */
+
+.pnet-graph {
+  width: 100%;
+  height: clamp(540px, 64vh, 820px);
+  min-height: 540px;
+  background: var(--card-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .pnet-graph {
+    height: min(68vh, 640px);
+    min-height: 460px;
+  }
+}
+
+.pnet-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}

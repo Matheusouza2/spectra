@@ -1,0 +1,9 @@
+[package]
+name = "racon-reduction"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+racon-core = { path = "../racon-core" }
+serde = { version = "1", features = ["derive"] }
+num-bigint = "0.4"

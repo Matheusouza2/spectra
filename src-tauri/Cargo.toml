@@ -1,0 +1,29 @@
+[package]
+name = "racon-desktop"
+version = "0.1.0"
+description = "Tauri app for Racon"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+num-bigint = "0.4"
+racon-core = { path = "../crates/racon-core" }
+racon-gspn = { path = "../crates/racon-gspn" }
+racon-reduction = { path = "../crates/racon-reduction" }
+racon-parsers = { path = "../crates/racon-parsers" }
+racon-structural = { path = "../crates/racon-structural" }
+racon-invariants = { path = "../crates/racon-invariants" }
+racon-executor = { path = "../crates/racon-executor" }
+racon-scc = { path = "../crates/racon-scc" }
+racon-reachability = { path = "../crates/racon-reachability" }
+racon-coverability = { path = "../crates/racon-coverability" }
+racon-ctl = { path = "../crates/racon-ctl" }
+racon-ctl-dsl = { path = "../crates/racon-ctl-dsl" }
+racon-property = { path = "../crates/racon-property" }
+racon-evidence = { path = "../crates/racon-evidence" }

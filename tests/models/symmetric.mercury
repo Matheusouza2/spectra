@@ -1,0 +1,6 @@
+SPN Model Symmetric {
+    place P0(tokens = 1);
+    place P1(tokens = 1);
+    place P2;
+    timedTransition T0(inputs = [P0, P1], outputs = [P2], delay = 0.0);
+}

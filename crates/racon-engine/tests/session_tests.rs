@@ -74,7 +74,8 @@ fn load_creates_independent_sessions_with_structural_properties() {
         property_codes,
         [
             "ORD", "HOM", "NBM", "PUR", "CSV", "SCF", "CON", "SC", "Ft0", "tF0", "Fp0", "pF0",
-            "MG", "SM", "FC", "EFC", "ES",
+            "MG", "SM", "FC", "EFC", "ES", "DTP", "SMC", "SMD", "SMA", "CPI", "CTI", "SB", "B",
+            "REV", "DSt", "BSt", "DTr", "DCF", "L", "LV", "L&S", "LL", "WL", "CL",
         ]
     );
 
@@ -95,7 +96,7 @@ fn load_creates_independent_sessions_with_structural_properties() {
         .find(|property| property.code == "CSV")
         .expect("missing CSV property");
     assert_eq!(csv.status, PropertyStatus::NotComputed);
-    assert_eq!(csv.source, PropertySource::Invariant);
+    assert_eq!(csv.source, PropertySource::Algebraic);
     assert_eq!(csv.value, None);
 
     let strongly_connected = response

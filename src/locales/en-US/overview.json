@@ -1,0 +1,17 @@
+{
+  "status.exact": "Exact analysis complete",
+  "status.structural": "Structural analysis complete; state space on demand",
+  "status.limit": "Partial analysis: state-space limit reached",
+  "status.cancelled": "Partial analysis: state space cancelled",
+  "status.unavailable": "Partial analysis: state space unavailable",
+  "status.available": "Result available",
+  "ariaLabel": "Analysis summary",
+  "eyebrow": "Overview",
+  "title": "Net diagnostics",
+  "states": "States",
+  "places": "Places",
+  "transitions": "Transitions",
+  "bounded": "Bounded",
+  "live": "Live",
+  "safe": "Safe"
+}

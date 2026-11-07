@@ -1,0 +1,8 @@
+SPN Model ExtendedFreeChoice {
+    place P0(tokens = 1);
+    place P1(tokens = 1);
+    place P2;
+    place P3;
+    timedTransition T0(inputs = [P0, P1], outputs = [P2], delay = 0.0);
+    timedTransition T1(inputs = [P0, P1], outputs = [P3], delay = 0.0);
+}

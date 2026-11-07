@@ -1,0 +1,12 @@
+[package]
+name = "racon-structural"
+version = "0.1.0"
+edition = "2021"
+description = "Structural analysis engine for RACoN"
+
+[dependencies]
+racon-core = { path = "../racon-core" }
+num-bigint = { version = "0.4", features = ["serde"] }
+racon-invariants = { path = "../racon-invariants" }
+racon-executor = { path = "../racon-executor" }
+thiserror = "1.0"

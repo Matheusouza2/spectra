@@ -1,0 +1,10 @@
+[package]
+name = "racon-reachability"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+racon-core = { path = "../racon-core" }
+racon-executor = { path = "../racon-executor" }
+thiserror = "1.0"
+rayon = "1.8"

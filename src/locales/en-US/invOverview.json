@@ -1,0 +1,10 @@
+{
+  "ariaLabel": "Invariants summary",
+  "eyebrow": "Algebraic analysis",
+  "title": "P/T Invariants",
+  "subtitle": "What the net conserves, what it can repeat, and what that implies.",
+  "pInvariants": "P-invariants",
+  "tInvariants": "T-invariants",
+  "conservative": "Conservative",
+  "structurallyBounded": "Structurally bounded"
+}

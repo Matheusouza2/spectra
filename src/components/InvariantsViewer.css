@@ -1,0 +1,82 @@
+/* ── P/T invariants ──
+ * Each invariant reads as a law: weighted chips of places (blue) or an ordered
+ * firing multiset of transitions (violet). A coverage strip shows what is left out. */
+
+.inv-layout { display: flex; flex-direction: column; gap: var(--space-8); }
+
+.inv-section { display: flex; flex-direction: column; gap: var(--space-4); }
+.inv-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding-bottom: var(--space-2); border-bottom: 1px solid var(--border); }
+.inv-section-head h2 { font-size: 1.0625rem; font-weight: 600; color: var(--text-main); }
+.inv-count { margin-left: var(--space-2); font-family: var(--font-mono); font-size: 0.875rem; font-weight: 500; color: var(--text-muted); }
+.inv-section-verdict { display: flex; align-items: baseline; gap: var(--space-2); font-size: 0.8125rem; color: var(--text-secondary); }
+
+.inv-verdict { font-weight: 600; font-size: 0.8125rem; }
+.inv-verdict.yes { color: var(--pos); }
+.inv-verdict.no { color: var(--neg); }
+.inv-verdict.na { color: var(--text-muted); }
+
+/* Coverage strip */
+.inv-coverage { display: flex; flex-direction: column; gap: var(--space-2); }
+.inv-coverage-strip { display: flex; gap: 2px; height: 10px; }
+.inv-cell { flex: 1 1 0; max-width: 28px; min-width: 3px; background: var(--bg-hover); border-radius: 1px; }
+.inv-cell.on.p { background: var(--accent); }
+.inv-cell.on.t { background: var(--accent-secondary); }
+.inv-coverage-text { font-size: 0.8125rem; color: var(--text-secondary); }
+.inv-coverage-text b { font-family: var(--font-mono); color: var(--text-main); font-weight: 600; }
+.inv-missing { color: var(--amber); font-family: var(--font-mono); }
+
+/* Invariant rows */
+.inv-list { list-style: none; display: flex; flex-direction: column; }
+.inv-item { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: var(--space-3); align-items: baseline; padding: var(--space-3) 0; border-bottom: 1px solid var(--border-light); }
+.inv-item:last-child { border-bottom: 0; }
+.inv-id { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 1.125rem; color: var(--text-muted); }
+.inv-id sub { font-size: 0.7em; }
+
+.inv-eq { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: 0.9375rem; }
+.inv-term { display: inline-flex; align-items: center; gap: var(--space-2); }
+.inv-seq { display: inline-flex; align-items: center; gap: var(--space-2); }
+.inv-op, .inv-arrow { color: var(--text-muted); }
+.inv-const { color: var(--text-muted); font-style: italic; font-family: Georgia, 'Times New Roman', serif; }
+
+.inv-chip { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid transparent; }
+.inv-chip.p { color: var(--accent); background: var(--accent-subtle); }
+.inv-chip.t { color: var(--accent-secondary); background: var(--accent-secondary-subtle); }
+.inv-coeff { font-weight: 600; }
+.inv-chip-name { font-weight: 500; }
+
+.inv-none { font-size: 0.875rem; color: var(--text-muted); }
+
+/* Consequences */
+.inv-facts { display: flex; flex-direction: column; }
+.inv-facts > div { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-2) 0; border-bottom: 1px solid var(--border-light); font-size: 0.875rem; }
+.inv-facts dt { color: var(--text-secondary); }
+.inv-facts dd { color: var(--text-main); font-weight: 500; }
+.inv-callout { padding: var(--space-3) var(--space-4); border-left: 4px solid var(--pos); background: var(--pos-subtle); color: var(--text-main); font-size: 0.875rem; border-radius: var(--radius-sm); }
+
+/* Help */
+.inv-help summary { cursor: pointer; width: fit-content; font-size: 0.8125rem; color: var(--accent); }
+.inv-help summary:hover { text-decoration: underline; }
+.inv-help p { margin-top: var(--space-2); max-width: 68ch; font-size: 0.8125rem; line-height: 1.6; color: var(--text-secondary); }
+
+.inv-empty { padding: var(--space-8); border: 1px dashed var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.875rem; display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
+.inv-recalc-btn { padding: var(--space-2) var(--space-4); background: var(--accent); color: var(--accent-text); border: 0; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; }
+
+.inv-layout summary:focus-visible, .inv-recalc-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* One-sided (sub / sur) invariants */
+.inv-oneside { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-4); border-top: 1px dashed var(--border); }
+.inv-oneside-title { display: flex; align-items: baseline; gap: var(--space-2); font-size: 0.9375rem; font-weight: 600; color: var(--text-main); }
+.inv-rel { display: inline-grid; place-items: center; width: 22px; height: 22px; font-family: var(--font-mono); font-size: 0.875rem; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); transform: translateY(2px); }
+.inv-oneside-desc { max-width: 68ch; font-size: 0.8125rem; line-height: 1.55; color: var(--text-secondary); }
+.inv-eq-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.inv-effect { font-size: 0.8125rem; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; }
+.inv-delta { font-family: var(--font-mono); font-size: 0.8125rem; }
+.inv-delta.neg { color: var(--neg); }
+.inv-delta.pos { color: var(--pos); }
+
+/* Basis of all invariants */
+.inv-basis { padding-top: var(--space-3); border-top: 1px dashed var(--border); }
+.inv-basis summary { cursor: pointer; width: fit-content; font-size: 0.9375rem; font-weight: 600; color: var(--text-main); }
+.inv-basis summary:hover { color: var(--accent); }
+.inv-basis summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.inv-basis-desc { margin: var(--space-2) 0 var(--space-3); max-width: 68ch; font-size: 0.8125rem; line-height: 1.55; color: var(--text-secondary); }

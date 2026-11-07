@@ -19,5 +19,6 @@ members = [
     "crates/racon-property",
     "crates/racon-reduction",
     "crates/racon-evidence",
+    "crates/racon-jni",
 ]
 exclude = ["src-tauri"]

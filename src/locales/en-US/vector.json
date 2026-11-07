@@ -1,0 +1,8 @@
+{
+  "status.complete": "All {total} values set.",
+  "status.partial": "{count} of {total} values. Next: {next}.",
+  "status.tooMany": "Too many values: expected {expected}, got {got}.",
+  "status.invalid": "\"{value}\" is not a valid value for {name}.",
+  "invalidShort": "invalid",
+  "missing": "not set yet"
+}

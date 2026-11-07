@@ -1,0 +1,22 @@
+{
+  "loadFailed": "Failed to load matrix: {error}",
+  "selectFile": "Select a .pnt file to view the incidence matrix.",
+  "calculating": "Computing incidence matrix...",
+  "unavailable": "Incidence matrix not available.",
+  "calculate": "Compute Matrix",
+  "title": "Incidence Matrix (Post − Pre)",
+  "legend": "Matrix legend",
+  "positive": "Positive (production)",
+  "negative": "Negative (consumption)",
+  "zero": "Zero (no effect)",
+  "cellDesc": "Each cell shows the change in tokens in the place (row) when the transition (column) fires.",
+  "transitionTitle": "Transition {name}",
+  "initialMarking": "Initial marking",
+  "placeTitle": "Place {name}",
+  "empty": "Empty matrix (no places or transitions).",
+  "stateEquation": "State Equation",
+  "stateEquationDesc": "Where M is the current marking, W is the incidence matrix and σ is the firing vector (each component is the number of times the transition fires).",
+  "example": "Example (single firing):",
+  "expand": "Expand matrix to full size",
+  "collapse": "Close"
+}

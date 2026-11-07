@@ -1,0 +1,12 @@
+{
+  "selectFailed": "Falha ao selecionar arquivo: {error}",
+  "success": "Análise concluída com sucesso",
+  "analysisFailed": "Falha na análise: {error}",
+  "dropPnt": "Arraste um arquivo .pnt",
+  "load": "Carregar",
+  "analyzing": "Analisando",
+  "analyze": "Analisar",
+  "heroTitle": "Solte uma rede aqui ou clique para procurar",
+  "heroSub": "Aceita",
+  "change": "Clique para escolher outro arquivo"
+}

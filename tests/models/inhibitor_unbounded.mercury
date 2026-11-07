@@ -1,0 +1,10 @@
+// Unbounded producer; the inhibitor never certifies a bound, so the exact
+// exploration must be truncated and reported as UNKNOWN (never as a proof).
+SPN Model InhibitorUnbounded {
+    place gate;
+    place tank;
+    timedTransition produce(inputs = [], outputs = [tank], inhibitors = [gate], delay = 0.0);
+}
+
+main {
+}

@@ -1,0 +1,10 @@
+[package]
+name = "racon-ctl-dsl"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+racon-core = { path = "../racon-core" }
+racon-ctl = { path = "../racon-ctl" }
+thiserror = "1.0"
+log = "0.4"

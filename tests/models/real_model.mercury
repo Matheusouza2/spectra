@@ -1,0 +1,36 @@
+k = 100;
+MST = 15;
+MAT = 6;
+
+
+SPN Model{
+
+	place P0( tokens= k );
+	place P1( tokens= 3 );
+	place P2;
+	place P3;
+
+
+	immediateTransition TI0(
+		inputs = [P2, P1],
+		outputs = [P3, P0]
+	);
+
+	timedTransition TE0(
+		inputs = [P0],
+		outputs = [P2],
+		delay = 0.0
+	);
+
+	timedTransition TE1(
+		inputs = [P3],
+		outputs = [P1],
+		delay = 0.0
+	);
+
+}
+
+main {
+	setIntegerParameters("k", "MST", "MAT");
+
+}

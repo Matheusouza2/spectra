@@ -1,0 +1,18 @@
+[package]
+name = "racon-evidence"
+version = "0.1.0"
+edition = "2021"
+description = "Mathematical proof and counterexample evidence for RACoN analyses"
+
+[dependencies]
+racon-core = { path = "../racon-core" }
+racon-invariants = { path = "../racon-invariants" }
+racon-reachability = { path = "../racon-reachability" }
+racon-coverability = { path = "../racon-coverability" }
+racon-structural = { path = "../racon-structural" }
+num-bigint = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+racon-parsers = { path = "../racon-parsers" }
+serde_json = "1.0"

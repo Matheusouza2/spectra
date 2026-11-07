@@ -1,0 +1,46 @@
+/* ── Error Boundary ── */
+
+.error-boundary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.error-boundary-icon {
+  font-size: 2rem;
+  margin-bottom: var(--space-2);
+  opacity: 0.5;
+}
+
+.error-boundary h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.error-boundary-msg {
+  color: var(--red);
+  font-size: 0.85rem;
+  margin: 0 0 var(--space-4);
+  max-width: 400px;
+}
+
+.error-boundary-btn {
+  padding: var(--space-2) var(--space-5);
+  background: var(--accent);
+  color: var(--accent-text);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: background var(--transition-fast);
+}
+
+.error-boundary-btn:hover { background: var(--accent-hover); }

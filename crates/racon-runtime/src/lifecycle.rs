@@ -179,12 +179,16 @@ impl Runtime {
                 let mut lifecycle = self.inner.lifecycle.lock().await;
 
                 match lifecycle.state {
-                    RuntimeState::Running => StartAction::Return(
-                        lifecycle
+                    RuntimeState::Running => {
+                        // §9: a second start is idempotent and reports the
+                        // already-running instance instead of rebinding.
+                        let mut info = lifecycle
                             .info
                             .clone()
-                            .expect("RUNNING runtime must retain its server information"),
-                    ),
+                            .expect("RUNNING runtime must retain its server information");
+                        info.status = "already_running".to_owned();
+                        StartAction::Return(info)
+                    }
                     RuntimeState::Starting => StartAction::WaitForStart(
                         lifecycle
                             .transition

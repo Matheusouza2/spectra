@@ -1,0 +1,11 @@
+[package]
+name = "racon-gspn"
+version = "0.1.0"
+edition = "2021"
+description = "GSPN (Generalized Stochastic Petri Net) specification types and analysis engine"
+
+[dependencies]
+racon-core = { path = "../racon-core" }
+
+[dev-dependencies]
+racon-parsers = { path = "../racon-parsers" }

@@ -1,0 +1,6 @@
+SPN Model Live {
+    place P0(tokens = 1);
+    place P1;
+    timedTransition T0(inputs = [P0], outputs = [P1], delay = 0.0);
+    timedTransition T1(inputs = [P1], outputs = [P0], delay = 0.0);
+}

@@ -1,0 +1,26 @@
+.ds { display: flex; flex-direction: column; gap: var(--space-5); max-width: 920px; }
+.ds-empty { padding: var(--space-8); border: 1px dashed var(--border); border-radius: var(--radius-md); color: var(--text-muted); font-size: 0.875rem; }
+.ds-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ds-run, .ds-secondary { height: 36px; padding: 0 var(--space-5); border-radius: var(--radius-sm); font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+.ds-run { background: var(--accent); color: var(--accent-text); border: 0; }
+.ds-run:hover:not(:disabled) { background: var(--accent-hover); }
+.ds-run:disabled { opacity: 0.45; cursor: not-allowed; }
+.ds-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+.ds-secondary:hover { background: var(--bg-elevated); }
+.ds-run:focus-visible, .ds-secondary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ds-result { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.ds-stats { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-8); }
+.ds-stats > div { display: flex; flex-direction: column-reverse; gap: 2px; }
+.ds-stats dt { font-size: 0.75rem; color: var(--text-muted); }
+.ds-stats dd { font-family: var(--font-mono); font-size: 1.375rem; font-weight: 600; color: var(--text-main); line-height: 1.1; }
+.ds-note { font-size: 0.8125rem; color: var(--text-secondary); max-width: 72ch; }
+.ds-title { margin-top: var(--space-2); font-size: 0.9375rem; font-weight: 600; color: var(--text-main); }
+.ds-hist { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.ds-hist li { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) 3rem; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: 0.8125rem; }
+.ds-d { text-align: right; color: var(--text-muted); }
+.ds-bar { height: 12px; background: var(--bg-elevated); border-radius: 2px; overflow: hidden; }
+.ds-bar > span { display: block; height: 100%; background: var(--accent); }
+.ds-n { color: var(--text-main); }
+.ds-target { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-left: 4px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-elevated); }
+.ds-target.found { border-left-color: var(--pos); }
+.ds-target.missing { border-left-color: var(--neg); }

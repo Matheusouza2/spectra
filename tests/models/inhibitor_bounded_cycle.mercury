@@ -1,0 +1,11 @@
+// A cycle whose return step is guarded by an inhibitor with threshold 2.
+SPN Model InhibitorBoundedCycle {
+    place a(tokens = 1);
+    place b;
+    place counter;
+    timedTransition go(inputs = [a], outputs = [b, counter], inhibitors = [counter(2)], delay = 0.0);
+    timedTransition back(inputs = [b], outputs = [a], delay = 0.0);
+}
+
+main {
+}

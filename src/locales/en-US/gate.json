@@ -1,0 +1,14 @@
+{
+  "loading": {
+    "title": "Checking boundedness…",
+    "text": "Queries unlock once the net is proven bounded."
+  },
+  "unbounded": {
+    "title": "This net is unbounded",
+    "text": "Queries run on the exact reachability graph, which is infinite here. You can still read this page, but running queries is disabled."
+  },
+  "unknown": {
+    "title": "Boundedness could not be proven",
+    "text": "Queries need a net that is proven bounded, and the analysis was inconclusive. Running queries is disabled."
+  }
+}

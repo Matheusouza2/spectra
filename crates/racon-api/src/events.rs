@@ -1,7 +1,7 @@
 use racon_engine::AnalysisSnapshot;
 use serde_json::{json, Value};
 
-pub const HEARTBEAT_INTERVAL_MS: u64 = 25;
+pub const HEARTBEAT_INTERVAL_MS: u64 = 15_000;
 
 pub fn event_name(snapshot: &AnalysisSnapshot) -> &'static str {
     match snapshot.status() {

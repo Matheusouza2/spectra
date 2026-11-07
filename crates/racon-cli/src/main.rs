@@ -13,6 +13,7 @@ use serde_json::{json, Map, Value};
 struct StartServerArgs {
     json: bool,
     port: Option<u16>,
+    fallback_port: bool,
 }
 
 #[derive(Debug)]
@@ -77,11 +78,7 @@ async fn main() -> ExitCode {
 
 async fn run(arguments: Vec<String>) -> Result<(), CliError> {
     let arguments = parse_arguments(arguments)?;
-    let runtime = api_runtime(RuntimeConfig {
-        port: arguments.port,
-        token_enabled: true,
-    });
-    let server = runtime.start_server().await?;
+    let (runtime, server) = start_with_optional_fallback(&arguments).await?;
 
     if arguments.json {
         write_json_line(&server_info_json(&server)).map_err(CliError::Output)?;
@@ -102,6 +99,32 @@ async fn run(arguments: Vec<String>) -> Result<(), CliError> {
     runtime.stop_server().await?;
     eprintln!("server stopped");
     Ok(())
+}
+
+/// Starts the server, optionally falling back to an ephemeral port when an
+/// explicitly requested port is occupied (spec §6.2).
+async fn start_with_optional_fallback(
+    arguments: &StartServerArgs,
+) -> Result<(Runtime, ServerInfo), CliError> {
+    let runtime = api_runtime(RuntimeConfig {
+        port: arguments.port,
+        token_enabled: true,
+    });
+    match runtime.start_server().await {
+        Ok(server) => Ok((runtime, server)),
+        Err(error) if arguments.fallback_port && error.code() == "PORT_UNAVAILABLE" => {
+            eprintln!(
+                "requested port is unavailable; searching for a free port (--fallback-port)"
+            );
+            let fallback = api_runtime(RuntimeConfig {
+                port: None,
+                token_enabled: true,
+            });
+            let server = fallback.start_server().await?;
+            Ok((fallback, server))
+        }
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn api_runtime(config: RuntimeConfig) -> Runtime {
@@ -131,10 +154,12 @@ fn parse_arguments(arguments: Vec<String>) -> Result<StartServerArgs, CliError> 
     let mut parsed = StartServerArgs {
         json: false,
         port: None,
+        fallback_port: false,
     };
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--json" => parsed.json = true,
+            "--fallback-port" => parsed.fallback_port = true,
             "--port" => {
                 let value = arguments.next().ok_or_else(|| {
                     CliError::InvalidArgument("--port requires a value from 0 to 65535".to_owned())

@@ -1,0 +1,5 @@
+SPN Model NonOrdinary {
+    place P0(tokens = 2);
+    place P1;
+    timedTransition T0(inputs = [P0(2)], outputs = [P1], delay = 0.0);
+}

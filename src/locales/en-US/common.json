@@ -1,0 +1,22 @@
+{
+  "settings": "Settings",
+  "theme": "Theme",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "viewLogs": "Event and error logs",
+  "language": "Language",
+  "switchToDark": "Switch to dark theme",
+  "switchToLight": "Switch to light theme",
+  "errorTitle": "Something went wrong",
+  "unknownError": "Unknown error",
+  "tryAgain": "Try again",
+  "close": "Close",
+  "yes": "Yes",
+  "no": "No",
+  "yesLower": "yes",
+  "noLower": "no",
+  "na": "N/A",
+  "errorWith": "Error: {error}",
+  "inconclusive": "Inconclusive",
+  "inconclusiveHint": "Computed, but the result could neither be confirmed nor refuted."
+}

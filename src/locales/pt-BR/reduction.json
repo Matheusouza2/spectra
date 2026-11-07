@@ -1,0 +1,9 @@
+{
+  "legend": "Reduções",
+  "plainOnly": "Apenas para redes lugar/transição simples (sem arcos inibidores nem transições imediatas).",
+  "noImmediate": "Indisponível para redes com transições imediatas.",
+  "stubborn.label": "Conjuntos stubborn",
+  "stubborn.hint": "Busca dirigida pela propriedade que ignora intercalações independentes. Mesmo veredito, em geral com bem menos estados.",
+  "structural.label": "Regras estruturais A–I",
+  "structural.hint": "Encolhe a rede para cada fórmula antes de buscar. Vale apenas para aquela fórmula."
+}

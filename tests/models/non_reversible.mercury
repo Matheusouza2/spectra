@@ -1,0 +1,5 @@
+SPN Model NonReversible {
+    place P0(tokens = 1);
+    place P1;
+    timedTransition T0(inputs = [P0], outputs = [P1], delay = 0.0);
+}

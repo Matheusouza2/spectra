@@ -1,0 +1,11 @@
+[package]
+name = "racon-parsers"
+version = "0.1.0"
+edition = "2021"
+description = "Format parsers for RACoN (PNML, PNT, MercuryScript)"
+
+[dependencies]
+racon-core = { path = "../racon-core" }
+racon-gspn = { path = "../racon-gspn" }
+quick-xml = "0.36"
+serde = { version = "1.0", features = ["derive"] }

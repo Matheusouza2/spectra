@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use racon_core::execution::{AnalysisConfig, AnalysisContext};
 use racon_engine::{
-    AnalysisSession, InvariantInteger, InvariantKind, InvariantQuery, InvariantQueryError,
+    AnalysisSession, InvariantInteger, InvariantKind, InvariantQuery,
     PropertyStatus,
 };
 
@@ -76,7 +76,7 @@ fn first_query_returns_named_dtos_and_second_query_reuses_cached_analysis() {
         .cached()
         .expect("first query should populate the cache");
 
-    assert_eq!(first.len(), 2);
+    assert_eq!(first.len(), 4);
 
     let place = first
         .iter()
@@ -165,28 +165,47 @@ fn place_transition_and_minimal_filters_are_applied_to_cached_semiflows() {
 }
 
 #[test]
-fn sub_and_sur_filters_are_explicitly_not_implemented() {
+fn sub_and_sur_filters_are_now_implemented() {
     let model = cycle_model();
     let session = AnalysisSession::load(model.path()).expect("session should load");
 
-    for query in [
-        InvariantQuery {
-            sub: true,
-            ..InvariantQuery::default()
-        },
-        InvariantQuery {
-            sur: true,
-            ..InvariantQuery::default()
-        },
-    ] {
-        let error = session
-            .query_invariants(&query, &context())
-            .expect_err("unsupported filter should fail explicitly");
-        assert!(matches!(error, InvariantQueryError::NotImplemented { .. }));
-        assert_eq!(error.code(), "NOT_IMPLEMENTED");
+    let sub = session
+        .query_invariants(
+            &InvariantQuery {
+                kind: InvariantKind::Sub,
+                ..InvariantQuery::default()
+            },
+            &context(),
+        )
+        .expect("SUB query should succeed");
+    assert!(!sub.is_empty());
+    for inv in &sub {
+        assert_eq!(inv.invariant_type, InvariantKind::Sub);
+        assert!(inv.relation.as_deref() == Some("LESS_OR_EQUAL"));
+        assert!(inv.residual.is_some());
+        assert!(inv.proper.is_some());
+        assert!(inv.exact.is_some());
     }
 
-    assert!(!session.invariants_cached());
+    let sur = session
+        .query_invariants(
+            &InvariantQuery {
+                kind: InvariantKind::Sur,
+                ..InvariantQuery::default()
+            },
+            &context(),
+        )
+        .expect("SUR query should succeed");
+    assert!(!sur.is_empty());
+    for inv in &sur {
+        assert_eq!(inv.invariant_type, InvariantKind::Sur);
+        assert!(inv.relation.as_deref() == Some("GREATER_OR_EQUAL"));
+        assert!(inv.residual.is_some());
+        assert!(inv.proper.is_some());
+        assert!(inv.exact.is_some());
+    }
+
+    assert!(session.invariants_cached());
 }
 
 #[test]

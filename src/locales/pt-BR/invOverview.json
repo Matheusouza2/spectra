@@ -1,0 +1,10 @@
+{
+  "ariaLabel": "Resumo dos invariantes",
+  "eyebrow": "Análise algébrica",
+  "title": "Invariantes P/T",
+  "subtitle": "O que a rede conserva, o que ela pode repetir e o que isso implica.",
+  "pInvariants": "P-invariantes",
+  "tInvariants": "T-invariantes",
+  "conservative": "Conservativa",
+  "structurallyBounded": "Estruturalmente limitada"
+}

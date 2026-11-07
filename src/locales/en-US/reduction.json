@@ -1,0 +1,9 @@
+{
+  "legend": "Reductions",
+  "plainOnly": "Only for plain place/transition nets (no inhibitor arcs or immediate transitions).",
+  "noImmediate": "Not available for nets with immediate transitions.",
+  "stubborn.label": "Stubborn sets",
+  "stubborn.hint": "Property-directed search that skips independent interleavings. Same verdict, usually far fewer states.",
+  "structural.label": "Structural rules A–I",
+  "structural.hint": "Shrinks the net for each formula before searching. Valid only for that formula."
+}

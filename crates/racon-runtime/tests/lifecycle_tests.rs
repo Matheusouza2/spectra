@@ -81,8 +81,11 @@ async fn start_binds_an_ephemeral_loopback_port_and_is_idempotent() {
         .await
         .expect("starting a running server should be idempotent");
 
-    assert_eq!(first, second);
     assert_eq!(first.status, "ready");
+    assert_eq!(second.status, "already_running");
+    assert_eq!(first.host, second.host);
+    assert_eq!(first.port, second.port);
+    assert_eq!(first.token, second.token);
     assert_eq!(first.host, "127.0.0.1");
     assert_ne!(first.port, 0);
     assert_eq!(first.protocol_version, "1.0");
@@ -265,7 +268,7 @@ async fn cancelling_start_caller_does_not_abandon_starting_transition() {
     assert_eq!(runtime.server_status().await, RuntimeState::Starting);
 
     start_task.abort();
-    release_factory.notify_waiters();
+    release_factory.notify_one();
     assert!(
         start_task
             .await
@@ -335,7 +338,7 @@ async fn cancelling_stop_caller_does_not_abandon_stopping_transition() {
         "join error should report caller cancellation"
     );
 
-    release_request.notify_waiters();
+    release_request.notify_one();
     let response = request_task.await.expect("request task should finish");
     assert!(response.ends_with("released"), "{response}");
 

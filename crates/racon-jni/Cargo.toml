@@ -1,0 +1,16 @@
+[package]
+name = "racon-jni"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "racon_jni"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+jni = "0.21"
+racon-api = { path = "../racon-api" }
+racon-engine = { path = "../racon-engine" }
+racon-runtime = { path = "../racon-runtime" }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "sync"] }

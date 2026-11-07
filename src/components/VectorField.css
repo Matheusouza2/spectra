@@ -1,0 +1,20 @@
+.vf-field { display: flex; flex-direction: column; gap: var(--space-2); }
+.vf-label { font-size: 0.9375rem; font-weight: 600; color: var(--text-main); }
+.vf-input { width: 100%; padding: var(--space-3) var(--space-4); font-family: var(--font-mono); font-size: 1.0625rem; background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.vf-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.vf-input.invalid { border-color: var(--neg); }
+.vf-help { font-size: 0.8125rem; color: var(--text-secondary); }
+.vf-status { min-height: 1.25rem; font-size: 0.8125rem; font-weight: 500; }
+.vf-status.muted { color: var(--text-muted); }
+.vf-status.ok { color: var(--pos); }
+.vf-status.error { color: var(--neg); }
+
+.vf-slots { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-2); }
+.vf-slot { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; }
+.vf-circle { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--border); background: var(--bg-surface); color: var(--text-muted); font-family: var(--font-mono); font-size: 1rem; font-weight: 600; transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast); }
+.vf-circle.has { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.vf-circle.neg { background: var(--neg-subtle); border-color: var(--neg); color: var(--neg); }
+.vf-slot.missing .vf-circle { border-style: dashed; }
+.vf-slot.invalid .vf-circle { border-color: var(--neg); color: var(--neg); background: var(--neg-subtle); }
+.vf-slot-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--text-secondary); text-align: center; }
+@media (prefers-reduced-motion: reduce) { .vf-circle { transition: none; } }

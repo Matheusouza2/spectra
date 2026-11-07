@@ -1,0 +1,4 @@
+.bgate { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-left: 4px solid var(--amber); border-radius: var(--radius-md); background: var(--amber-subtle); font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5; }
+.bgate strong { color: var(--text-main); font-weight: 600; }
+.bgate.unbounded { border-left-color: var(--neg); background: var(--neg-subtle); }
+.bgate.loading { border-left-color: var(--border); background: var(--bg-elevated); }

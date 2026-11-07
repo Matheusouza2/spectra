@@ -1,0 +1,17 @@
+{
+  "status.exact": "Análise exata concluída",
+  "status.structural": "Análise estrutural concluída; espaço de estados sob demanda",
+  "status.limit": "Análise parcial: limite do espaço de estados atingido",
+  "status.cancelled": "Análise parcial: espaço de estados cancelado",
+  "status.unavailable": "Análise parcial: espaço de estados indisponível",
+  "status.available": "Resultado disponível",
+  "ariaLabel": "Resumo da análise",
+  "eyebrow": "Visão geral",
+  "title": "Diagnóstico da rede",
+  "states": "Estados",
+  "places": "Places",
+  "transitions": "Transições",
+  "bounded": "Limitada",
+  "live": "Viva",
+  "safe": "Segura"
+}

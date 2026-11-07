@@ -1,0 +1,68 @@
+{
+  "protocol_version": "1.0",
+  "note": "Known results for tests/models/*.mercury (spec \u00a753). Structural codes are resolved at load; behavioral codes require a state-space job.",
+  "models": {
+    "ordinary": {
+      "ORD": "TRUE"
+    },
+    "nonordinary": {
+      "ORD": "FALSE"
+    },
+    "homogeneous": {
+      "HOM": "TRUE"
+    },
+    "nonhomogeneous": {
+      "HOM": "FALSE"
+    },
+    "pure": {
+      "PUR": "TRUE"
+    },
+    "nonpure": {
+      "PUR": "FALSE"
+    },
+    "marked_graph": {
+      "MG": "TRUE"
+    },
+    "state_machine": {
+      "SM": "TRUE"
+    },
+    "free_choice": {
+      "FC": "TRUE"
+    },
+    "extended_free_choice": {
+      "FC": "FALSE",
+      "EFC": "TRUE"
+    },
+    "bounded": {
+      "B": "TRUE"
+    },
+    "unbounded": {
+      "B": "FALSE"
+    },
+    "deadlock": {
+      "DSt": "TRUE"
+    },
+    "no_deadlock": {
+      "DSt": "FALSE"
+    },
+    "live": {
+      "L": "TRUE"
+    },
+    "non_live": {
+      "L": "FALSE"
+    },
+    "reversible": {
+      "REV": "TRUE"
+    },
+    "non_reversible": {
+      "REV": "FALSE"
+    },
+    "symmetric": {
+      "generator_count": ">=1"
+    },
+    "high_concurrency": {
+      "B": "TRUE",
+      "L": "TRUE"
+    }
+  }
+}

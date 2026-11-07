@@ -1,0 +1,10 @@
+[package]
+name = "racon-executor"
+version = "0.1.0"
+edition = "2021"
+description = "Parallel execution infrastructure for RACoN analysis engines"
+
+[dependencies]
+racon-core = { path = "../racon-core" }
+rayon = "1.8"
+thiserror = "1.0"

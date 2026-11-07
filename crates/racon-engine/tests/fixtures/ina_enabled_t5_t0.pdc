@@ -1,0 +1,10 @@
+predicate for net:   0 BNA
+Conjunction nr:  5
+m + p8.SS_AVAILABLE      low =  1  upp = oo
+m + p7.OR_BUFFER         low =  1  upp = oo
+m + p3.MP1_STOPED        low =  1  upp = oo
+m + p0.IR                low =  1  upp = oo
+Conjunction nr:  0
+m + p2.MP1_RUNNING       low =  1  upp = oo
+m + p1.IR_BUFFER         low =  3  upp = oo
+@

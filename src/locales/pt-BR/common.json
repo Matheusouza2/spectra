@@ -1,0 +1,22 @@
+{
+  "settings": "Configurações",
+  "theme": "Tema",
+  "themeLight": "Claro",
+  "themeDark": "Escuro",
+  "viewLogs": "Logs de eventos e erros",
+  "language": "Idioma",
+  "switchToDark": "Mudar para tema escuro",
+  "switchToLight": "Mudar para tema claro",
+  "errorTitle": "Algo deu errado",
+  "unknownError": "Erro desconhecido",
+  "tryAgain": "Tentar novamente",
+  "close": "Fechar",
+  "yes": "Sim",
+  "no": "Não",
+  "yesLower": "sim",
+  "noLower": "não",
+  "na": "N/A",
+  "errorWith": "Erro: {error}",
+  "inconclusive": "Inconclusivo",
+  "inconclusiveHint": "Calculado, mas o resultado não pôde ser confirmado nem refutado."
+}

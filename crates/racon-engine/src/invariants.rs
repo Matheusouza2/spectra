@@ -2,10 +2,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, RwLock};
 
+use num_bigint::BigInt;
 use racon_core::execution::AnalysisContext;
 use racon_core::net::PetriNet;
 use racon_invariants::{
-    derive_structural_properties, InvariantAnalysisResult, InvariantEngine, InvariantEngineImpl,
+    compute_minimal_place_inequality_invariants, derive_structural_properties, InequalityRelation,
+    InvariantAnalysisResult, InvariantEngine, InvariantEngineImpl, PlaceInequalityInvariant,
 };
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +16,8 @@ use serde::{Deserialize, Serialize};
 pub enum InvariantKind {
     Place,
     Transition,
+    Sub,
+    Sur,
     #[default]
     All,
 }
@@ -88,6 +92,18 @@ pub struct InvariantDto {
     pub vector: Vec<InvariantInteger>,
     pub support: Vec<String>,
     pub terms: Vec<InvariantTermDto>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub residual: Option<Vec<InvariantInteger>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proper: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exact: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_value: Option<InvariantInteger>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verified: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,6 +144,8 @@ impl std::error::Error for InvariantQueryError {}
 #[derive(Debug, Default)]
 pub struct InvariantCache {
     value: RwLock<Option<Arc<InvariantAnalysisResult>>>,
+    sub_invariants: RwLock<Option<Arc<Vec<PlaceInequalityInvariant>>>>,
+    sur_invariants: RwLock<Option<Arc<Vec<PlaceInequalityInvariant>>>>,
 }
 
 impl InvariantCache {
@@ -186,6 +204,46 @@ impl InvariantCache {
 
         Ok(result)
     }
+
+    pub fn get_or_compute_inequality(
+        &self,
+        net: &PetriNet,
+        relation: InequalityRelation,
+        context: &AnalysisContext,
+    ) -> Result<Arc<Vec<PlaceInequalityInvariant>>, InvariantQueryError> {
+        let (lock, other_lock) = match relation {
+            InequalityRelation::LessOrEqual => (&self.sub_invariants, &self.sur_invariants),
+            InequalityRelation::GreaterOrEqual => (&self.sur_invariants, &self.sub_invariants),
+        };
+        if let Some(cached) = lock
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+        {
+            return Ok(cached);
+        }
+        // Check again after acquiring write lock (double-check pattern).
+        let mut guard = lock
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(cached) = guard.as_ref() {
+            return Ok(Arc::clone(cached));
+        }
+        let matrix: Vec<Vec<BigInt>> = {
+            let im = net.incidence_matrix();
+            (0..im.place_count())
+                .map(|p| (0..im.transition_count()).map(|t| im.get(p, t).unwrap()).collect())
+                .collect()
+        };
+        let invariants =
+            compute_minimal_place_inequality_invariants(&matrix, relation, context)
+                .map_err(|e| InvariantQueryError::Computation(e.to_string()))?;
+        let result = Arc::new(invariants);
+        *guard = Some(Arc::clone(&result));
+        // Eagerly compute the opposite direction if not yet cached (warm-up).
+        let _ = other_lock; // Placeholder for future eager computation.
+        Ok(result)
+    }
 }
 
 pub(crate) fn query_invariants(
@@ -228,16 +286,46 @@ pub(crate) fn query_invariants(
         }
     }
 
+    if matches!(query.kind, InvariantKind::Sub | InvariantKind::All) {
+        let sub_invariants = cache.get_or_compute_inequality(
+            net,
+            InequalityRelation::LessOrEqual,
+            context,
+        )?;
+        for invariant in sub_invariants.iter() {
+            if let Some(dto) = inequality_dto(
+                InvariantKind::Sub,
+                invariant,
+                net.places().iter().map(|place| place.name.as_str()),
+                query,
+            )? {
+                result.push(dto);
+            }
+        }
+    }
+
+    if matches!(query.kind, InvariantKind::Sur | InvariantKind::All) {
+        let sur_invariants = cache.get_or_compute_inequality(
+            net,
+            InequalityRelation::GreaterOrEqual,
+            context,
+        )?;
+        for invariant in sur_invariants.iter() {
+            if let Some(dto) = inequality_dto(
+                InvariantKind::Sur,
+                invariant,
+                net.places().iter().map(|place| place.name.as_str()),
+                query,
+            )? {
+                result.push(dto);
+            }
+        }
+    }
+
     Ok(result)
 }
 
-fn validate_query(query: &InvariantQuery) -> Result<(), InvariantQueryError> {
-    if query.sub {
-        return Err(InvariantQueryError::NotImplemented { filter: "sub" });
-    }
-    if query.sur {
-        return Err(InvariantQueryError::NotImplemented { filter: "sur" });
-    }
+fn validate_query(_query: &InvariantQuery) -> Result<(), InvariantQueryError> {
     Ok(())
 }
 
@@ -283,5 +371,84 @@ where
         vector,
         support,
         terms,
+        relation: None,
+        residual: None,
+        proper: None,
+        exact: None,
+        initial_value: None,
+        verified: None,
+    }))
+}
+
+fn inequality_dto<'a, I>(
+    invariant_type: InvariantKind,
+    invariant: &PlaceInequalityInvariant,
+    names: I,
+    query: &InvariantQuery,
+) -> Result<Option<InvariantDto>, InvariantQueryError>
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    if query
+        .minimal
+        .is_some_and(|expected| expected != invariant.is_minimal)
+    {
+        return Ok(None);
+    }
+
+    let names: Vec<_> = names.into_iter().collect();
+    let decimal_coefficients: Vec<_> = invariant
+        .coefficients
+        .iter()
+        .map(|c| c.to_string())
+        .collect();
+    let vector: Vec<_> = decimal_coefficients
+        .iter()
+        .map(|coefficient| InvariantInteger::from_decimal(coefficient))
+        .collect::<Result<_, _>>()?;
+    if query.positive && vector.iter().any(|coefficient| !coefficient.is_positive()) {
+        return Ok(None);
+    }
+
+    let terms: Vec<_> = names
+        .iter()
+        .zip(vector.iter())
+        .filter(|(_, coefficient)| !coefficient.is_zero())
+        .map(|(name, coefficient)| InvariantTermDto {
+            node: (*name).to_owned(),
+            coefficient: coefficient.clone(),
+        })
+        .collect();
+    let support = terms.iter().map(|term| term.node.clone()).collect();
+
+    let relation_str = match invariant.relation {
+        InequalityRelation::LessOrEqual => "LESS_OR_EQUAL".to_owned(),
+        InequalityRelation::GreaterOrEqual => "GREATER_OR_EQUAL".to_owned(),
+    };
+
+    let residual: Vec<InvariantInteger> = invariant
+        .residual
+        .iter()
+        .map(|r| InvariantInteger::from_decimal(&r.to_string()))
+        .collect::<Result<_, _>>()?;
+
+    let initial_value = invariant
+        .initial_value
+        .as_ref()
+        .map(|v| InvariantInteger::from_decimal(&v.to_string()))
+        .transpose()?;
+
+    Ok(Some(InvariantDto {
+        invariant_type,
+        minimal: invariant.is_minimal,
+        vector,
+        support,
+        terms,
+        relation: Some(relation_str),
+        residual: Some(residual),
+        proper: Some(invariant.is_proper),
+        exact: Some(invariant.is_exact),
+        initial_value,
+        verified: None,
     }))
 }

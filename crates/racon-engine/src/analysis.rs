@@ -5,20 +5,62 @@ use std::sync::{Arc, Mutex, RwLock, Weak};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use racon_core::execution::{AnalysisConfig, AnalysisContext, CancellationToken};
-use racon_coverability::{
-    CoverabilityEngine, CoverabilityEngineImpl, CoverabilityError, CoverabilityGraph,
-    CoverabilityStrategy,
+use racon_coverability::{decide_boundedness, 
+    CoverabilityEngine, CoverabilityEngineImpl, CoverabilityError, CoverabilityStrategy,
 };
 use racon_invariants::{verify_structural_boundedness_certificate, InvariantAnalysisResult};
 use racon_reachability::{
-    ReachabilityEngine, ReachabilityEngineImpl, ReachabilityError, ReachabilityGraph,
+    ReachabilityEngine, ReachabilityEngineImpl, ReachabilityError,
+};
+use racon_reduction::{
+    decide_boundedness_stubborn, BoundSearchConfig, BoundTarget, BoundVerdict,
+    ReducedExplorationConfig, ReducedReachabilityGraph, ReductionError, ReductionKind,
+    SymmetryOptions,
 };
 use serde::Serialize;
 use tokio::sync::broadcast;
 
+use crate::state_space::StateSpaceHandle;
+
 use super::AnalysisSession;
 
 static NEXT_ANALYSIS_ID: AtomicU64 = AtomicU64::new(1);
+
+/// User-selected state-space construction options (spec §31-38).
+///
+/// Incompatible reduction combinations are rejected by
+/// `racon_reduction::plan` at the API boundary, so the worker only ever sees a
+/// validated set.
+#[derive(Debug, Clone, Default)]
+pub struct AnalysisRequest {
+    pub reductions: Vec<ReductionKind>,
+    pub symmetry: SymmetryOptions,
+    /// Explicit exploration backend (algorithm catalogue). `None` keeps the
+    /// legacy automatic choice.
+    pub exploration: Option<ExplorationChoice>,
+}
+
+/// Exploration algorithms selectable for a state-space job.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExplorationChoice {
+    /// `reachability_bfs`
+    Bfs,
+    /// `reachability_dfs`
+    Dfs,
+    /// `coverability_karp_miller`
+    KarpMiller,
+}
+
+impl ExplorationChoice {
+    pub fn from_catalog_id(id: &str) -> Option<Self> {
+        match id {
+            "reachability_bfs" => Some(Self::Bfs),
+            "reachability_dfs" => Some(Self::Dfs),
+            "coverability_karp_miller" => Some(Self::KarpMiller),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BoundednessDecision {
@@ -71,73 +113,6 @@ impl JobStatus {
     }
 }
 
-enum CompletedStateSpace {
-    Reachability(ReachabilityGraph),
-    Coverability(CoverabilityGraph),
-}
-
-impl CompletedStateSpace {
-    fn counts(&self) -> AnalysisCounts {
-        match self {
-            Self::Reachability(graph) => AnalysisCounts {
-                states_discovered: graph.nodes.len(),
-                states_processed: graph.nodes.iter().filter(|node| node.is_expanded).count(),
-                edges_discovered: graph.edges.len(),
-                frontier_size: graph.nodes.iter().filter(|node| !node.is_expanded).count(),
-                omega_nodes: 0,
-            },
-            Self::Coverability(graph) => AnalysisCounts {
-                states_discovered: graph.nodes.len(),
-                states_processed: graph
-                    .nodes
-                    .iter()
-                    .filter(|node| node.is_active && node.is_expanded)
-                    .count(),
-                edges_discovered: graph.edges.len(),
-                frontier_size: graph
-                    .nodes
-                    .iter()
-                    .filter(|node| node.is_active && !node.is_expanded)
-                    .count(),
-                omega_nodes: graph.stats.omega_nodes,
-            },
-        }
-    }
-
-    fn into_snapshot(self, elapsed_ms: u64) -> (AnalysisCounts, EngineStateSpaceMetadata) {
-        let counts = self.counts();
-        let metadata = match self {
-            Self::Reachability(graph) => EngineStateSpaceMetadata {
-                kind: "REACHABILITY",
-                algorithm: "BREADTH_FIRST_SEARCH",
-                exact: graph.complete,
-                reduced: false,
-                reductions: Vec::new(),
-                nodes: counts.states_discovered,
-                edges: counts.edges_discovered,
-                omega_nodes: counts.omega_nodes,
-                elapsed_ms,
-                peak_memory: None,
-                completed: graph.complete,
-            },
-            Self::Coverability(_) => EngineStateSpaceMetadata {
-                kind: "COVERABILITY",
-                algorithm: "KARP_MILLER",
-                exact: false,
-                reduced: false,
-                reductions: Vec::new(),
-                nodes: counts.states_discovered,
-                edges: counts.edges_discovered,
-                omega_nodes: counts.omega_nodes,
-                elapsed_ms,
-                peak_memory: None,
-                completed: true,
-            },
-        };
-        (counts, metadata)
-    }
-}
-
 #[derive(Debug, Clone, Copy, Default)]
 struct AnalysisCounts {
     states_discovered: usize,
@@ -147,11 +122,55 @@ struct AnalysisCounts {
     omega_nodes: usize,
 }
 
+fn counts_of(handle: &StateSpaceHandle) -> AnalysisCounts {
+    let counts = handle.counts();
+    AnalysisCounts {
+        states_discovered: counts.states_discovered,
+        states_processed: counts.states_processed,
+        edges_discovered: counts.edges_discovered,
+        frontier_size: counts.frontier_size,
+        omega_nodes: counts.omega_nodes,
+    }
+}
+
+fn metadata_of(
+    handle: &StateSpaceHandle,
+    extended: bool,
+    elapsed_ms: u64,
+) -> EngineStateSpaceMetadata {
+    let counts = handle.counts();
+    EngineStateSpaceMetadata {
+        semantics_version: racon_core::SEMANTICS_VERSION,
+        priority_policy: racon_core::PRIORITY_POLICY,
+        analysis_scope: if extended {
+            "extended_behavior"
+        } else {
+            "plain_pt_behavior"
+        },
+        kind: handle.kind(),
+        algorithm: handle.algorithm(),
+        exact: handle.is_exact(),
+        reduced: handle.reduced(),
+        reductions: handle.reductions(),
+        variant: handle.variant(),
+        nodes: counts.states_discovered,
+        edges: counts.edges_discovered,
+        omega_nodes: counts.omega_nodes,
+        peak_frontier: counts.frontier_size,
+        threads: std::thread::available_parallelism()
+            .map(|threads| threads.get())
+            .unwrap_or(1),
+        elapsed_ms,
+        peak_memory: None,
+        completed: handle.completed(),
+    }
+}
+
 struct JobData {
     status: JobStatus,
     phase: &'static str,
     elapsed_ms: u64,
-    worker_outcome: Option<Result<CompletedStateSpace, AnalysisFailure>>,
+    worker_outcome: Option<Result<StateSpaceHandle, AnalysisFailure>>,
     counts: AnalysisCounts,
     metadata: Option<EngineStateSpaceMetadata>,
     error: Option<String>,
@@ -160,6 +179,7 @@ struct JobData {
 struct JobState {
     analysis_id: String,
     session: Weak<AnalysisSession>,
+    request: AnalysisRequest,
     cancellation: CancellationToken,
     started_at: Instant,
     data: Mutex<JobData>,
@@ -167,11 +187,16 @@ struct JobState {
 }
 
 impl JobState {
-    fn new(analysis_id: String, session: Arc<AnalysisSession>) -> Self {
+    fn new(
+        analysis_id: String,
+        session: Arc<AnalysisSession>,
+        request: AnalysisRequest,
+    ) -> Self {
         let (events, _) = broadcast::channel(32);
         Self {
             analysis_id,
             session: Arc::downgrade(&session),
+            request,
             cancellation: CancellationToken::new(),
             started_at: Instant::now(),
             events,
@@ -243,7 +268,7 @@ impl JobState {
         }
     }
 
-    fn record_worker_outcome(&self, outcome: Result<CompletedStateSpace, AnalysisFailure>) {
+    fn record_worker_outcome(&self, outcome: Result<StateSpaceHandle, AnalysisFailure>) {
         let mut data = self
             .data
             .lock()
@@ -281,11 +306,19 @@ impl JobState {
         });
         match outcome {
             Ok(result) => {
-                let (counts, metadata) = result.into_snapshot(data.elapsed_ms);
+                if let Some(session) = self.session.upgrade() {
+                    session.record_state_space_time(data.elapsed_ms);
+                    session.store_state_space(Arc::new(result.clone()));
+                }
                 data.status = JobStatus::Completed;
                 data.phase = "COMPLETED";
-                data.counts = counts;
-                data.metadata = Some(metadata);
+                data.counts = counts_of(&result);
+                let extended = self
+                    .session
+                    .upgrade()
+                    .map(|session| session.net.is_extended())
+                    .unwrap_or(false);
+                data.metadata = Some(metadata_of(&result, extended, data.elapsed_ms));
             }
             Err(AnalysisFailure::Cancelled) => {
                 data.status = JobStatus::Cancelled;
@@ -324,7 +357,7 @@ impl JobState {
         &self,
         session: &AnalysisSession,
         context: &AnalysisContext,
-    ) -> Result<CompletedStateSpace, AnalysisFailure> {
+    ) -> Result<StateSpaceHandle, AnalysisFailure> {
         let invariants = session
             .invariant_cache
             .get_or_compute(&session.net, context)
@@ -339,22 +372,176 @@ impl JobState {
             .check_cancellation()
             .map_err(|_| AnalysisFailure::Cancelled)?;
 
+        if session.net.is_extended() {
+            return self.compute_extended_state_space(session, &invariants, context);
+        }
+
+        // Explicit algorithm choice from the catalogue: never replaced silently.
+        if let Some(choice) = self.request.exploration {
+            if self.request.reductions.is_empty() {
+                return match choice {
+                    ExplorationChoice::Bfs => ReachabilityEngineImpl::default()
+                        .build_complete(&session.net, context)
+                        .map(StateSpaceHandle::Reachability)
+                        .map_err(AnalysisFailure::from),
+                    ExplorationChoice::Dfs => ReachabilityEngineImpl::default()
+                        .build_complete_dfs(&session.net, context)
+                        .map(StateSpaceHandle::DepthFirstReachability)
+                        .map_err(AnalysisFailure::from),
+                    ExplorationChoice::KarpMiller => CoverabilityEngineImpl::default()
+                        .build_complete(&session.net, CoverabilityStrategy::KarpMiller, context)
+                        .map(StateSpaceHandle::Coverability)
+                        .map_err(AnalysisFailure::from),
+                };
+            }
+        }
+
+        if self
+            .request
+            .reductions
+            .contains(&ReductionKind::FinkelMinimalCoverability)
+        {
+            return CoverabilityEngineImpl::default()
+                .build_complete(
+                    &session.net,
+                    CoverabilityStrategy::FinkelMinimalCoverability,
+                    context,
+                )
+                .map(StateSpaceHandle::MinimalCoverability)
+                .map_err(AnalysisFailure::from);
+        }
+
+        // Symmetry/stubborn reductions are applied while the reachability graph
+        // is constructed (§33, §34), never by pruning a full exploration.
+        if !self.request.reductions.is_empty() {
+            return ReducedReachabilityGraph::build(
+                &session.net,
+                &self.request.reductions,
+                &self.request.symmetry,
+                ReducedExplorationConfig::default(),
+                context,
+            )
+            .map(StateSpaceHandle::ReducedReachability)
+            .map_err(AnalysisFailure::from);
+        }
+
         match BoundednessDecision::before_exploration(session, &invariants) {
             BoundednessDecision::ProvedBounded => ReachabilityEngineImpl::default()
                 .build_complete(&session.net, context)
-                .map(CompletedStateSpace::Reachability)
+                .map(StateSpaceHandle::Reachability)
                 .map_err(AnalysisFailure::from),
-            BoundednessDecision::Unknown => CoverabilityEngineImpl::default()
-                .build_complete(&session.net, CoverabilityStrategy::KarpMiller, context)
-                .map(CompletedStateSpace::Coverability)
-                .map_err(AnalysisFailure::from),
+            BoundednessDecision::Unknown => {
+                // Starke Satz 4.3: decide boundedness first, halting at the
+                // first marking that strictly covers an ancestor, and publish
+                // the verdict right away so `Bounded` does not wait for the
+                // (possibly huge) coverability graph. The graph kind and
+                // exactness contract of the job is unchanged.
+                // The stubborn-reduced search (Schmidt 1999, Thm 1) decides the
+                // same question on a smaller graph; both of its verdicts are
+                // sound. When it cannot decide within budget (or the net is
+                // extended) the classical early test takes over.
+                let stubborn = decide_boundedness_stubborn(
+                    &session.net,
+                    BoundTarget::Net,
+                    BoundSearchConfig {
+                        max_nodes: 100_000,
+                        use_stubborn: true,
+                    },
+                    context,
+                );
+                match stubborn {
+                    Ok(report) => session
+                        .record_boundedness(Some(matches!(report.verdict, BoundVerdict::Bounded))),
+                    Err(ReductionError::Cancelled) => return Err(AnalysisFailure::Cancelled),
+                    Err(_) => {
+                        if let Ok(verdict) = decide_boundedness(&session.net, 100_000, context) {
+                            session.record_boundedness(verdict.as_bool());
+                        }
+                    }
+                }
+                context
+                    .check_cancellation()
+                    .map_err(|_| AnalysisFailure::Cancelled)?;
+                CoverabilityEngineImpl::default()
+                    .build_complete(&session.net, CoverabilityStrategy::KarpMiller, context)
+                    .map(StateSpaceHandle::Coverability)
+                    .map_err(AnalysisFailure::from)
+            }
         }
+    }
+
+    /// Exact exploration for nets with inhibitor arcs or immediate transitions.
+    ///
+    /// Karp-Miller/Finkel acceleration, dominance pruning, the dominance-based
+    /// boundedness test and every state-space reduction assume a monotone
+    /// firing relation, which inhibitors and immediate precedence break
+    /// (spec §5.3). The only conclusive procedure available is exhaustive
+    /// exploration of the extended graph; if resources run out, the outcome is
+    /// reported as UNKNOWN, never as a negative proof.
+    fn compute_extended_state_space(
+        &self,
+        session: &AnalysisSession,
+        invariants: &InvariantAnalysisResult,
+        context: &AnalysisContext,
+    ) -> Result<StateSpaceHandle, AnalysisFailure> {
+        if !self.request.reductions.is_empty() {
+            return Err(AnalysisFailure::Failed(format!(
+                "UNSUPPORTED: reductions {:?} are not defined for nets with inhibitor arcs or immediate transitions ({})",
+                self.request
+                    .reductions
+                    .iter()
+                    .map(|kind| kind.as_str())
+                    .collect::<Vec<_>>(),
+                racon_core::SEMANTICS_VERSION
+            )));
+        }
+
+        // Boundedness certificates from P-invariants / Murata inequalities are
+        // algebraic and remain valid: the extended firing relation is a
+        // restriction of the ordinary one, so it only reaches fewer markings.
+        let certified_bounded =
+            BoundednessDecision::before_exploration(session, invariants)
+                == BoundednessDecision::ProvedBounded;
+        let engine = if certified_bounded {
+            ReachabilityEngineImpl::default()
+        } else {
+            ReachabilityEngineImpl {
+                config: racon_reachability::ReachabilityConfig {
+                    max_nodes: EXTENDED_UNCERTIFIED_NODE_LIMIT,
+                    ..racon_reachability::ReachabilityConfig::default()
+                },
+            }
+        };
+        let dfs = self.request.exploration == Some(ExplorationChoice::Dfs);
+        let built = if dfs {
+            engine
+                .build_complete_dfs(&session.net, context)
+                .map(StateSpaceHandle::DepthFirstReachability)
+        } else {
+            engine
+                .build_complete(&session.net, context)
+                .map(StateSpaceHandle::Reachability)
+        };
+        built.map_err(|error| match error {
+                ReachabilityError::Cancelled => AnalysisFailure::Cancelled,
+                limit @ (ReachabilityError::NodeLimitExceeded { .. }
+                | ReachabilityError::EdgeLimitExceeded { .. }
+                | ReachabilityError::MemoryLimitExceeded { .. }) => {
+                    AnalysisFailure::Failed(format!(
+                        "UNKNOWN (state_limit_reached): exact exploration of the extended net was truncated; no conclusion about deadlock, boundedness, liveness or reversibility is valid. {limit}"
+                    ))
+                }
+                other => AnalysisFailure::Failed(other.to_string()),
+            })
     }
 
     fn elapsed_ms(&self) -> u64 {
         self.started_at.elapsed().as_millis() as u64
     }
 }
+
+/// Node budget for extended nets that are not certified bounded algebraically.
+const EXTENDED_UNCERTIFIED_NODE_LIMIT: usize = 1_000_000;
 
 enum AnalysisFailure {
     Cancelled,
@@ -374,6 +561,15 @@ impl From<CoverabilityError> for AnalysisFailure {
     fn from(error: CoverabilityError) -> Self {
         match error {
             CoverabilityError::Cancelled => Self::Cancelled,
+            other => Self::Failed(other.to_string()),
+        }
+    }
+}
+
+impl From<ReductionError> for AnalysisFailure {
+    fn from(error: ReductionError) -> Self {
+        match error {
+            ReductionError::Cancelled => Self::Cancelled,
             other => Self::Failed(other.to_string()),
         }
     }
@@ -399,9 +595,13 @@ impl fmt::Debug for AnalysisJobRegistry {
 }
 
 impl AnalysisJobRegistry {
-    pub(crate) fn create(&self, session: Arc<AnalysisSession>) -> String {
+    pub(crate) fn create(
+        &self,
+        session: Arc<AnalysisSession>,
+        request: AnalysisRequest,
+    ) -> String {
         let analysis_id = new_analysis_id();
-        let job = Arc::new(JobState::new(analysis_id.clone(), session));
+        let job = Arc::new(JobState::new(analysis_id.clone(), session, request));
         self.jobs
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -457,20 +657,42 @@ impl AnalysisJobRegistry {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct EngineStateSpaceMetadata {
+    semantics_version: &'static str,
+    priority_policy: &'static str,
+    analysis_scope: &'static str,
     kind: &'static str,
     algorithm: &'static str,
     exact: bool,
     reduced: bool,
     reductions: Vec<String>,
+    variant: &'static str,
     nodes: usize,
     edges: usize,
     omega_nodes: usize,
+    peak_frontier: usize,
+    threads: usize,
     elapsed_ms: u64,
     peak_memory: Option<usize>,
     completed: bool,
 }
 
 impl EngineStateSpaceMetadata {
+    /// Identifier of the enabling/firing semantics the graph was built with.
+    pub fn semantics_version(&self) -> &'static str {
+        self.semantics_version
+    }
+
+    /// Precedence policy between transition kinds.
+    pub fn priority_policy(&self) -> &'static str {
+        self.priority_policy
+    }
+
+    /// `extended_behavior` when inhibitors/immediates were evaluated,
+    /// `plain_pt_behavior` otherwise.
+    pub fn analysis_scope(&self) -> &'static str {
+        self.analysis_scope
+    }
+
     pub fn kind(&self) -> &'static str {
         self.kind
     }
@@ -491,6 +713,10 @@ impl EngineStateSpaceMetadata {
         &self.reductions
     }
 
+    pub fn variant(&self) -> &'static str {
+        self.variant
+    }
+
     pub fn nodes(&self) -> usize {
         self.nodes
     }
@@ -501,6 +727,14 @@ impl EngineStateSpaceMetadata {
 
     pub fn omega_nodes(&self) -> usize {
         self.omega_nodes
+    }
+
+    pub fn peak_frontier(&self) -> usize {
+        self.peak_frontier
+    }
+
+    pub fn threads(&self) -> usize {
+        self.threads
     }
 
     pub fn elapsed_ms(&self) -> u64 {
@@ -593,13 +827,14 @@ mod tests {
 
     use racon_core::execution::CancellationToken;
 
-    use super::{AnalysisCounts, AnalysisFailure, JobData, JobState, JobStatus};
+    use super::{AnalysisCounts, AnalysisFailure, AnalysisRequest, JobData, JobState, JobStatus};
     use crate::AnalysisSession;
 
     fn running_job() -> Arc<JobState> {
         Arc::new(JobState {
             analysis_id: "analysis-cancellation-ordering".to_owned(),
             session: Weak::<AnalysisSession>::new(),
+            request: AnalysisRequest::default(),
             cancellation: CancellationToken::new(),
             started_at: Instant::now(),
             events: tokio::sync::broadcast::channel(32).0,

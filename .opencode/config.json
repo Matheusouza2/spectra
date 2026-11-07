@@ -1,0 +1,16 @@
+{
+"provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "racon-model:latest": {
+          "name": "Qwen 3"
+        }
+      }
+    }
+  }
+}

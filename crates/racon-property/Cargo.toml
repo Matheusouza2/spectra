@@ -1,0 +1,14 @@
+[package]
+name = "racon-property"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+num-bigint = { version = "0.4", features = ["serde"] }
+num-traits = "0.2"
+racon-core = { path = "../racon-core" }
+racon-ctl = { path = "../racon-ctl" }
+racon-invariants = { path = "../racon-invariants" }
+racon-scc = { path = "../racon-scc" }
+racon-structural = { path = "../racon-structural" }
+thiserror = "1.0"

@@ -1,0 +1,7 @@
+SPN Model NonHomogeneous {
+    place P0(tokens = 3);
+    place P1;
+    place P2;
+    timedTransition T0(inputs = [P0(2)], outputs = [P1], delay = 0.0);
+    timedTransition T1(inputs = [P0(1)], outputs = [P2], delay = 0.0);
+}

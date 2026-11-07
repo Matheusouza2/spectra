@@ -1,0 +1,12 @@
+// IMM-01/IMM-04: `fast` (immediate) preempts `slow` (normal) while enabled.
+// `slow` is dead in the extended semantics, though alive in the P/T projection.
+SPN Model ImmediatePrecedence {
+    place p0(tokens = 1);
+    place p1;
+    immediateTransition fast(inputs = [p0], outputs = [p1]);
+    timedTransition slow(inputs = [p0], outputs = [p1], delay = 0.0);
+    timedTransition back(inputs = [p1], outputs = [p0], delay = 0.0);
+}
+
+main {
+}

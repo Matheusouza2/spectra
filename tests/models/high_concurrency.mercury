@@ -1,0 +1,18 @@
+SPN Model HighConcurrency {
+    place A0(tokens = 1);
+    place A1;
+    place B0(tokens = 1);
+    place B1;
+    place C0(tokens = 1);
+    place C1;
+    place D0(tokens = 1);
+    place D1;
+    timedTransition TA0(inputs = [A0], outputs = [A1], delay = 0.0);
+    timedTransition TA1(inputs = [A1], outputs = [A0], delay = 0.0);
+    timedTransition TB0(inputs = [B0], outputs = [B1], delay = 0.0);
+    timedTransition TB1(inputs = [B1], outputs = [B0], delay = 0.0);
+    timedTransition TC0(inputs = [C0], outputs = [C1], delay = 0.0);
+    timedTransition TC1(inputs = [C1], outputs = [C0], delay = 0.0);
+    timedTransition TD0(inputs = [D0], outputs = [D1], delay = 0.0);
+    timedTransition TD1(inputs = [D1], outputs = [D0], delay = 0.0);
+}

@@ -1,0 +1,8 @@
+{
+  "kicker": "Registro local",
+  "title": "Diagnóstico da aplicação",
+  "refresh": "Atualizar",
+  "location": "Arquivo racon.log · mostrando até 2.000 eventos recentes",
+  "readError": "Não foi possível ler os registros: {error}",
+  "empty": "Nenhum evento registrado ainda."
+}

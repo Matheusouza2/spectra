@@ -388,7 +388,375 @@ async fn behavioral_properties_do_not_start_state_space_implicitly() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["scope"], "behavioral");
-    assert_eq!(body["properties"][0]["code"], "REV");
-    assert_eq!(body["properties"][0]["status"], "NOT_COMPUTED");
-    assert_eq!(body["properties"][0]["requires"], json!(["STATE_SPACE"]));
+    let rev = body["properties"]
+        .as_array()
+        .expect("properties should be an array")
+        .iter()
+        .find(|property| property["code"] == "REV")
+        .expect("behavioral scope should expose REV");
+    assert_eq!(rev["status"], "NOT_COMPUTED");
+    assert_eq!(rev["requires"], json!(["STATE_SPACE"]));
+    // Behavioral properties must not silently start heavy exploration.
+    assert!(body["properties"]
+        .as_array()
+        .expect("properties should be an array")
+        .iter()
+        .all(|property| property["value"].is_null()));
+}
+
+async fn start_state_space_with_body(app: &Router, session_id: &str, body: Value) -> String {
+    let (status, response) = json_response(
+        app,
+        request(
+            Method::POST,
+            &format!("/v1/sessions/{session_id}/state-space"),
+            body,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    assert_eq!(response["status"], "RUNNING");
+    response["analysis_id"]
+        .as_str()
+        .expect("start should return an analysis id")
+        .to_owned()
+}
+
+#[tokio::test]
+async fn symmetry_reduction_is_reported_and_never_fabricates_behavioral_properties() {
+    let app = test_router();
+    let model = cycle_model();
+    let session_id = load_model(&app, &model).await;
+    let analysis_id = start_state_space_with_body(
+        &app,
+        &session_id,
+        json!({ "reductions": ["SYMMETRY"] }),
+    )
+    .await;
+
+    let completed = poll_terminal(&app, &analysis_id).await;
+    assert_eq!(completed["status"], "COMPLETED");
+    let metadata = &completed["metadata"];
+    assert_eq!(metadata["kind"], "REACHABILITY");
+    assert_eq!(metadata["algorithm"], "SYMMETRY_REDUCED_BFS");
+    assert_eq!(metadata["reduced"], true);
+    assert_eq!(metadata["reductions"], json!(["SYMMETRY"]));
+    assert_eq!(metadata["variant"], "symmetry");
+
+    let (status, body) = json_response(
+        &app,
+        request(
+            Method::GET,
+            &format!("/v1/sessions/{session_id}/properties?scope=behavioral"),
+            Value::Null,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let rev = body["properties"]
+        .as_array()
+        .expect("properties should be an array")
+        .iter()
+        .find(|property| property["code"] == "REV")
+        .expect("behavioral scope should expose REV");
+    assert_eq!(rev["status"], "UNKNOWN");
+    assert_eq!(rev["source"], "REDUCED_STATE_SPACE");
+    assert_eq!(
+        rev["rule"],
+        "STATE_SPACE_PROPERTY_NOT_PRESERVED_BY_REDUCTION"
+    );
+    // State-space-derived properties must stay unproven under a reduction.
+    assert!(body["properties"]
+        .as_array()
+        .expect("properties should be an array")
+        .iter()
+        .filter(|property| property["source"] == "REDUCED_STATE_SPACE")
+        .all(|property| property["value"].is_null()));
+}
+
+#[tokio::test]
+async fn stubborn_reduction_is_reported_with_its_variant() {
+    let app = test_router();
+    let model = cycle_model();
+    let session_id = load_model(&app, &model).await;
+    let analysis_id = start_state_space_with_body(
+        &app,
+        &session_id,
+        json!({ "reductions": ["STUBBORN"] }),
+    )
+    .await;
+
+    let completed = poll_terminal(&app, &analysis_id).await;
+    assert_eq!(completed["status"], "COMPLETED");
+    let metadata = &completed["metadata"];
+    assert_eq!(metadata["algorithm"], "STUBBORN_REDUCED_BFS");
+    assert_eq!(metadata["reduced"], true);
+    assert_eq!(metadata["reductions"], json!(["STUBBORN"]));
+    assert_eq!(metadata["variant"], "stubborn");
+}
+
+#[tokio::test]
+async fn finkel_minimal_coverability_is_reported_as_its_own_algorithm() {
+    let app = test_router();
+    let model = unbounded_counter_model();
+    let session_id = load_model(&app, &model).await;
+    let analysis_id = start_state_space_with_body(
+        &app,
+        &session_id,
+        json!({ "reductions": ["FINKEL_MINIMAL_COVERABILITY"] }),
+    )
+    .await;
+
+    let completed = poll_terminal(&app, &analysis_id).await;
+    assert_eq!(completed["status"], "COMPLETED");
+    let metadata = &completed["metadata"];
+    assert_eq!(metadata["kind"], "COVERABILITY");
+    assert_eq!(metadata["algorithm"], "FINKEL_MINIMAL_COVERABILITY");
+    assert_eq!(metadata["reduced"], true);
+    assert_eq!(metadata["reductions"], json!(["FINKEL_MINIMAL_COVERABILITY"]));
+}
+
+#[tokio::test]
+async fn unsupported_and_incompatible_reduction_requests_are_rejected() {
+    let app = test_router();
+    let model = cycle_model();
+    let session_id = load_model(&app, &model).await;
+
+    let (status, body) = json_response(
+        &app,
+        request(
+            Method::POST,
+            &format!("/v1/sessions/{session_id}/state-space"),
+            json!({ "reductions": ["NOT_A_REDUCTION"] }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body["error"]["code"], "REDUCTION_NOT_SUPPORTED");
+
+    let (status, body) = json_response(
+        &app,
+        request(
+            Method::POST,
+            &format!("/v1/sessions/{session_id}/state-space"),
+            json!({ "reductions": ["SYMMETRY", "FINKEL_MINIMAL_COVERABILITY"] }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body["error"]["code"], "REDUCTION_NOT_APPLICABLE");
+}
+
+fn inhibitor_guarded_model() -> TemporaryMercuryFile {
+    TemporaryMercuryFile::new(
+        r#"
+        SPN Model Guarded {
+            place gate(tokens = 1);
+            place src(tokens = 1);
+            place dst;
+            timedTransition t0(inputs = [src], outputs = [dst], inhibitors = [gate], delay = 0.0);
+            immediateTransition t1(inputs = [gate], outputs = [gate]);
+        }
+
+        main {
+        }
+        "#,
+    )
+}
+
+#[tokio::test]
+async fn http_api_exposes_extended_semantics_for_inhibitors_and_immediates() {
+    let app = test_router();
+    let model = inhibitor_guarded_model();
+    let (status, loaded) = json_response(
+        &app,
+        request(Method::POST, "/v1/nets/load", json!({ "path": model.path() })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(loaded["net"]["inhibitor_arcs"], 1);
+    assert_eq!(loaded["net"]["immediate_transitions"], 1);
+    assert_eq!(loaded["net"]["extended"], true);
+    assert_eq!(loaded["net"]["semantics_version"], "racon-extended-pt-v1");
+    assert_eq!(loaded["net"]["priority_policy"], "immediate_over_normal");
+
+    let session_id = loaded["session_id"].as_str().unwrap().to_owned();
+    let analysis_id = start_state_space(&app, &session_id).await;
+    let terminal = poll_terminal(&app, &analysis_id).await;
+    assert_eq!(terminal["status"], "COMPLETED", "{terminal}");
+    let metadata = &terminal["metadata"];
+    assert_eq!(metadata["analysis_scope"], "extended_behavior");
+    assert_eq!(metadata["semantics_version"], "racon-extended-pt-v1");
+    assert_eq!(metadata["kind"], "REACHABILITY");
+    assert_eq!(metadata["algorithm"], "BREADTH_FIRST_SEARCH");
+    assert_eq!(metadata["exact"], true);
+    // t0 is inhibited by `gate` and the immediate self-loop t1 preempts nothing
+    // else: the only state is M0 and t1 loops on it.
+    assert_eq!(metadata["nodes"], 1);
+
+    let (_, props) = json_response(
+        &app,
+        request(
+            Method::GET,
+            &format!("/v1/sessions/{session_id}/properties?scope=behavioral"),
+            Value::Null,
+        ),
+    )
+    .await;
+    let dtr = props["properties"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["code"] == "DTr")
+        .unwrap();
+    assert_eq!(dtr["value"], true, "t0 is dead under the extended semantics");
+    assert_eq!(dtr["analysis_scope"], "extended_behavior");
+
+    // reductions are refused up front, with a structured error
+    let (status, body) = json_response(
+        &app,
+        request(
+            Method::POST,
+            &format!("/v1/sessions/{session_id}/state-space"),
+            json!({ "reductions": ["STUBBORN"] }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body["error"]["code"], "UNSUPPORTED");
+}
+
+#[tokio::test]
+async fn algorithm_catalogue_and_validation_endpoints_follow_the_capability_matrix() {
+    let app = test_router();
+    let (status, catalogue) =
+        json_response(&app, request(Method::GET, "/v1/analysis/algorithms", Value::Null)).await;
+    assert_eq!(status, StatusCode::OK);
+    let algorithms = catalogue["algorithms"].as_array().unwrap();
+    let mincov = algorithms.iter().find(|a| a["id"] == "coverability_mincov").unwrap();
+    assert_eq!(mincov["status"], "experimental");
+    assert_eq!(mincov["selectable"], true);
+    assert!(algorithms.iter().any(|a| a["id"] == "coverability_mp" && a["selectable"] == false));
+    assert!(catalogue["references"].as_array().unwrap().iter().any(|r| r["id"] == "R6"));
+
+    let (_, ok) = json_response(
+        &app,
+        request(
+            Method::POST,
+            "/v1/analysis/config/validate",
+            json!({"objective": "coverability", "exploration": "coverability_mincov",
+                   "net_class": "PT_WEIGHTED"}),
+        ),
+    )
+    .await;
+    assert_eq!(ok["status"], "valid");
+    assert_eq!(ok["experimental"], true);
+
+    let (_, blocked) = json_response(
+        &app,
+        request(
+            Method::POST,
+            "/v1/analysis/config/validate",
+            json!({"objective": "coverability", "exploration": "coverability_karp_miller",
+                   "reductions": ["partial_order_stubborn"], "net_class": "PT_WEIGHTED"}),
+        ),
+    )
+    .await;
+    assert_eq!(blocked["status"], "unsupported_combination");
+}
+
+#[tokio::test]
+async fn explicit_dfs_job_builds_the_exact_graph_and_reports_its_algorithm() {
+    let app = test_router();
+    let model = cycle_model();
+    let session_id = load_model(&app, &model).await;
+    let analysis_id = start_state_space_with_body(
+        &app,
+        &session_id,
+        json!({"exploration": "reachability_dfs"}),
+    )
+    .await;
+    let terminal = poll_terminal(&app, &analysis_id).await;
+    assert_eq!(terminal["status"], "COMPLETED", "{terminal}");
+    assert_eq!(terminal["metadata"]["algorithm"], "DEPTH_FIRST_SEARCH");
+    assert_eq!(terminal["metadata"]["kind"], "REACHABILITY");
+    assert_eq!(terminal["metadata"]["exact"], true);
+    assert_eq!(terminal["metadata"]["nodes"], 2);
+}
+
+#[tokio::test]
+async fn unknown_or_unavailable_exploration_ids_are_rejected_with_a_structured_error() {
+    let app = test_router();
+    let model = cycle_model();
+    let session_id = load_model(&app, &model).await;
+    for id in ["coverability_mp", "coverability_mincov", "nonsense"] {
+        let (status, body) = json_response(
+            &app,
+            request(
+                Method::POST,
+                &format!("/v1/sessions/{session_id}/state-space"),
+                json!({ "exploration": id }),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{id}");
+        assert_eq!(body["error"]["code"], "UNSUPPORTED_COMBINATION");
+    }
+}
+
+#[tokio::test]
+async fn mincov_endpoint_returns_the_minimal_coverability_set_and_marks_it_experimental() {
+    let app = test_router();
+    let model = unbounded_counter_model();
+    let session_id = load_model(&app, &model).await;
+    let (status, body) = json_response(
+        &app,
+        request(
+            Method::POST,
+            &format!("/v1/sessions/{session_id}/coverability-set"),
+            Value::Null,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["algorithm"], "coverability_mincov");
+    assert_eq!(body["kind"], "MINIMAL_COVERABILITY_SET");
+    assert_eq!(body["experimental"], true);
+    assert_eq!(body["bounded"], false);
+    assert!(!body["unbounded_places"].as_array().unwrap().is_empty());
+    assert!(body["elements"].to_string().contains("omega"));
+    assert!(body["does_not_preserve"].to_string().contains("deadlock"));
+
+    // bounded model: no omega
+    let bounded = cycle_model();
+    let bounded_id = load_model(&app, &bounded).await;
+    let (_, body) = json_response(
+        &app,
+        request(
+            Method::POST,
+            &format!("/v1/sessions/{bounded_id}/coverability-set"),
+            Value::Null,
+        ),
+    )
+    .await;
+    assert_eq!(body["bounded"], true);
+    assert!(!body["elements"].to_string().contains("omega"));
+}
+
+#[tokio::test]
+async fn mincov_is_refused_for_extended_nets() {
+    let app = test_router();
+    let model = inhibitor_guarded_model();
+    let session_id = load_model(&app, &model).await;
+    let (status, body) = json_response(
+        &app,
+        request(
+            Method::POST,
+            &format!("/v1/sessions/{session_id}/coverability-set"),
+            Value::Null,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body["error"]["code"], "UNSUPPORTED_COMBINATION");
 }

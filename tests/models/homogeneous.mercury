@@ -1,0 +1,6 @@
+SPN Model Homogeneous {
+    place P0(tokens = 2);
+    place P1;
+    place P2;
+    timedTransition T0(inputs = [P0(2)], outputs = [P1(2), P2(2)], delay = 0.0);
+}

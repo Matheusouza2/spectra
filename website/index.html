@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#e9efeb" />
+    <meta name="description" content="RACoN is a desktop Petri net analyzer for structural analysis, reachability, coverability, and CTL verification." />
+    <title>RACoN — Petri net analysis, made visible</title>
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="site.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="RACoN home">
+        <span class="brand-mark" aria-hidden="true"><i></i><b></b><i></i></span>
+        <span>RACoN</span>
+      </a>
+      <nav aria-label="Main navigation" data-i18n-aria="nav.label">
+        <a href="#about" data-i18n="nav.about">About</a>
+        <a href="#workflow" data-i18n="nav.workflow">How it works</a>
+        <a href="#downloads" data-i18n="nav.downloads">Downloads</a>
+      </nav>
+      <div class="top-actions">
+        <button class="language" id="language-toggle" type="button" aria-label="Switch to Portuguese">PT <span>⌄</span></button>
+        <a class="top-download" href="#downloads" data-i18n="nav.cta">Get RACoN <span aria-hidden="true">↗</span></a>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero wrap" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="eyebrow-dot"></span><span data-i18n="hero.eyebrow">A desktop workbench for Petri nets</span></p>
+          <h1 id="hero-title" data-i18n="hero.title">See how your<br /><em>systems can move.</em></h1>
+          <p class="hero-lede" data-i18n="hero.lede">RACoN turns Petri net models into something you can inspect, explore, and verify — from the first token to the full state space.</p>
+          <div class="hero-actions">
+            <a class="button button-dark" href="#downloads"><span data-i18n="hero.cta">Download RACoN</span><span aria-hidden="true">↓</span></a>
+            <a class="text-link" href="#workflow"><span data-i18n="hero.secondary">See how to use it</span><span aria-hidden="true">↘</span></a>
+          </div>
+          <div class="hero-meta"><span class="meta-rule"></span><span data-i18n="hero.meta">Free · Desktop · Windows, Linux &amp; macOS</span></div>
+        </div>
+        <div class="net-card" aria-label="Illustration of a Petri net with places, transitions, and token flow" data-i18n-aria="hero.diagramAlt">
+          <div class="net-card-head"><span data-i18n="diagram.title">PETRI NET / LIVE MODEL</span><span class="live-indicator"><i></i><span data-i18n="diagram.status">READY</span></span></div>
+          <svg class="net-diagram" viewBox="0 0 620 350" role="img" aria-labelledby="net-title net-desc">
+            <title id="net-title">A small Petri net</title>
+            <desc id="net-desc">Four places connected by three transitions, with tokens shown as amber dots.</desc>
+            <defs><pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M 28 0 L 0 0 0 28" fill="none" stroke="#d9e3df" stroke-width="1" /></pattern><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#68858a" /></marker></defs>
+            <rect width="620" height="350" fill="url(#grid)" />
+            <g class="net-lines" fill="none" stroke="#68858a" stroke-width="2" marker-end="url(#arrow)">
+              <path d="M115 176 H203"/><path d="M245 176 H325"/><path d="M365 176 H453"/><path d="M495 176 H553"/>
+              <path d="M345 196 C345 273 153 273 153 196"/>
+            </g>
+            <g class="transition"><rect x="204" y="149" width="42" height="54" rx="3"/><rect x="324" y="149" width="42" height="54" rx="3"/><rect x="453" y="149" width="42" height="54" rx="3"/></g>
+            <g class="place"><circle cx="92" cy="176" r="24"/><circle cx="345" cy="176" r="24"/><circle cx="575" cy="176" r="24"/><circle cx="153" cy="290" r="24"/></g>
+            <g class="tokens"><circle cx="84" cy="176" r="4.5"/><circle cx="98" cy="176" r="4.5"/><circle cx="345" cy="176" r="4.5"/><circle cx="575" cy="176" r="4.5"/></g>
+            <g class="net-label"><text x="92" y="225">P₀ · INPUT</text><text x="225" y="132">T₀</text><text x="345" y="225">P₁ · BUFFER</text><text x="345" y="132">T₁</text><text x="474" y="132">T₂</text><text x="575" y="225">P₂ · OUTPUT</text><text x="153" y="337">P₃ · FEEDBACK</text></g>
+            <g class="diagram-tag"><rect x="24" y="24" width="151" height="29" rx="14"/><text x="39" y="43" data-i18n="diagram.tag">INITIAL MARKING  M₀</text></g>
+          </svg>
+          <div class="net-card-foot"><span><i class="legend-place"></i><span data-i18n="diagram.places">Places</span></span><span><i class="legend-transition"></i><span data-i18n="diagram.transitions">Transitions</span></span><span><i class="legend-token"></i><span data-i18n="diagram.tokens">Tokens</span></span><span class="diagram-foot-note" data-i18n="diagram.caption">A model is the beginning of the story.</span></div>
+        </div>
+      </section>
+
+      <section class="ticker" aria-label="RACoN capabilities">
+        <div class="ticker-inner"><span data-i18n="ticker.one">STRUCTURAL PROPERTIES</span><b>✳</b><span data-i18n="ticker.two">STATE SPACE</span><b>✳</b><span data-i18n="ticker.three">CTL MODEL CHECKING</span><b>✳</b><span data-i18n="ticker.four">TOKEN GAME</span><b>✳</b><span data-i18n="ticker.five">COVERABILITY</span></div>
+      </section>
+
+      <section class="about-section wrap" id="about">
+        <div class="section-intro"><p class="eyebrow"><span class="eyebrow-index">01</span><span data-i18n="about.kicker">A model you can question</span></p><h2 data-i18n="about.title">From formal model<br />to <em>clear answers.</em></h2></div>
+        <div class="about-copy"><p data-i18n="about.body">Petri nets describe systems where events compete for resources, happen in parallel, or wait on one another. RACoN gives students, researchers, and engineers a practical way to reason about those systems: load a model, inspect its structure, explore possible states, and check whether the behavior meets a formal property.</p><p class="about-note" data-i18n="about.note">Built for discrete-event systems, workflows, protocols, and any process where “what can happen next?” matters.</p></div>
+      </section>
+
+      <section class="capabilities wrap" aria-label="Analysis tools">
+        <article class="capability"><span class="cap-icon icon-structure" aria-hidden="true"><i></i><i></i><i></i><b></b></span><p class="cap-label" data-i18n="cap.one.label">UNDERSTAND</p><h3 data-i18n="cap.one.title">Read the structure</h3><p data-i18n="cap.one.body">Inspect places, transitions, arcs, incidence matrices, structural properties, and invariants.</p></article>
+        <article class="capability capability-featured"><span class="cap-icon icon-states" aria-hidden="true"><i></i><i></i><i></i><b></b><b></b></span><p class="cap-label" data-i18n="cap.two.label">EXPLORE</p><h3 data-i18n="cap.two.title">Trace what can happen</h3><p data-i18n="cap.two.body">Build reachability graphs or coverability results, then follow paths and inspect markings.</p></article>
+        <article class="capability"><span class="cap-icon icon-check" aria-hidden="true"><i></i><i></i><b>✓</b></span><p class="cap-label" data-i18n="cap.three.label">VERIFY</p><h3 data-i18n="cap.three.title">Check a property</h3><p data-i18n="cap.three.body">Evaluate CTL formulas and bad-state queries, with witnesses or counterexamples when available.</p></article>
+      </section>
+
+      <section class="workflow-section" id="workflow">
+        <div class="wrap workflow-wrap"><div class="workflow-heading"><p class="eyebrow"><span class="eyebrow-index">02</span><span data-i18n="workflow.kicker">A practical workflow</span></p><h2 data-i18n="workflow.title">Bring a model.<br /><em>Follow the behavior.</em></h2><p data-i18n="workflow.intro">RACoN keeps the path from input to result visible and interactive.</p></div>
+          <div class="steps">
+            <article class="step"><span class="step-mark">A</span><div><h3 data-i18n="workflow.step1.title">Load your net</h3><p data-i18n="workflow.step1.body">Open an INA/PNT `.pnt` file or paste a compatible Mercury script. RACoN validates the model before analysis.</p></div><span class="step-arrow" aria-hidden="true">↘</span></article>
+            <article class="step"><span class="step-mark">B</span><div><h3 data-i18n="workflow.step2.title">Choose a question</h3><p data-i18n="workflow.step2.body">Start with structural properties, calculate invariants, generate a state space, or define a CTL or bad-state check.</p></div><span class="step-arrow" aria-hidden="true">↘</span></article>
+            <article class="step"><span class="step-mark">C</span><div><h3 data-i18n="workflow.step3.title">Explore the result</h3><p data-i18n="workflow.step3.body">Inspect graphs, markings, paths, evidence, and algorithm limits. Use the token game to step through enabled transitions.</p></div><span class="step-arrow" aria-hidden="true">✓</span></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="downloads wrap" id="downloads">
+        <div class="download-heading"><p class="eyebrow"><span class="eyebrow-index">03</span><span data-i18n="download.kicker">Choose your platform</span></p><h2 data-i18n="download.title">Take the workbench<br /><em>to your desktop.</em></h2><p data-i18n="download.intro">The latest builds are created from the `main` branch. Pick your system to download its installer.</p><a class="release-link" href="https://github.com/Matheusouza2/spectra/releases/latest" data-i18n="download.all">View all files in the latest release ↗</a></div>
+        <div class="download-options">
+          <article class="download-card" data-platform="windows"><div class="platform-symbol windows-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="platform-text"><h3>Windows</h3><p data-i18n="download.windows">Windows 10 or later · 64-bit</p></div><a class="download-button" href="https://github.com/Matheusouza2/spectra/releases/latest" data-fallback="https://github.com/Matheusouza2/spectra/releases/latest"><span data-i18n="download.button">Download</span><span class="file-kind">.MSI</span><span class="download-arrow" aria-hidden="true">↓</span></a></article>
+          <article class="download-card" data-platform="linux"><div class="platform-symbol linux-symbol" aria-hidden="true"><i></i><b></b></div><div class="platform-text"><h3>Linux</h3><p data-i18n="download.linux">Ubuntu / Debian · 64-bit</p></div><a class="download-button" href="https://github.com/Matheusouza2/spectra/releases/latest" data-fallback="https://github.com/Matheusouza2/spectra/releases/latest"><span data-i18n="download.button">Download</span><span class="file-kind">.DEB</span><span class="download-arrow" aria-hidden="true">↓</span></a></article>
+          <article class="download-card" data-platform="macos"><div class="platform-symbol apple-symbol" aria-hidden="true">◒</div><div class="platform-text"><h3>macOS</h3><p data-i18n="download.macos">macOS · Disk image</p></div><a class="download-button" href="https://github.com/Matheusouza2/spectra/releases/latest" data-fallback="https://github.com/Matheusouza2/spectra/releases/latest"><span data-i18n="download.button">Download</span><span class="file-kind">.DMG</span><span class="download-arrow" aria-hidden="true">↓</span></a></article>
+          <p class="download-status" id="download-status" role="status" data-i18n="download.status">Checking the latest release…</p>
+          <p class="download-caution" data-i18n="download.caution">macOS packages are ad-hoc signed and not notarized. macOS may require you to allow the app under Privacy &amp; Security after installation.</p>
+        </div>
+      </section>
+
+      <section class="closing wrap"><div class="closing-mark" aria-hidden="true">R</div><p data-i18n="closing.line">A model is a question. RACoN helps you follow the answer.</p><a href="#downloads" class="closing-link" data-i18n="closing.cta">Find your download ↓</a></section>
+    </main>
+
+    <footer class="footer"><div class="wrap footer-inner"><span class="footer-brand">RACoN <span>REACHABILITY AND COVERABILITY NET ANALYZER</span></span><div><a href="https://github.com/Matheusouza2/spectra" data-i18n="footer.source">Source code</a><a href="https://github.com/Matheusouza2/spectra/issues" data-i18n="footer.issues">Report an issue</a></div><span class="footer-copy">© <span id="year"></span> RACoN</span></div></footer>
+  </body>
+</html>

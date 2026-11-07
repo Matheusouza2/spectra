@@ -144,7 +144,16 @@ async fn load_persists_a_session_for_structural_properties_and_invariants() {
     );
     assert_eq!(
         load["net"],
-        json!({ "places": 2, "transitions": 2, "arcs": 4 })
+        json!({
+            "places": 2,
+            "transitions": 2,
+            "arcs": 4,
+            "inhibitor_arcs": 0,
+            "immediate_transitions": 0,
+            "extended": false,
+            "semantics_version": "racon-extended-pt-v1",
+            "priority_policy": "immediate_over_normal"
+        })
     );
     assert_eq!(load["properties"][0]["code"], "ORD");
 
@@ -179,12 +188,12 @@ async fn load_persists_a_session_for_structural_properties_and_invariants() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(invariants["invariants"].as_array().map(Vec::len), Some(2));
+    assert!(invariants["invariants"].as_array().is_some_and(|items| items.len() >= 2));
     assert_eq!(invariants["invariants"][0]["minimal"], true);
     assert!(invariants["invariants"].as_array().is_some_and(|items| {
         items
             .iter()
-            .all(|item| matches!(item["type"].as_str(), Some("PLACE" | "TRANSITION")))
+            .all(|item| matches!(item["type"].as_str(), Some("PLACE" | "TRANSITION" | "SUB" | "SUR")))
     }));
 }
 
@@ -280,14 +289,17 @@ async fn unsupported_invariant_filters_return_conflict_without_populating_a_resu
         &app,
         request(
             Method::GET,
-            &format!("/v1/sessions/{session_id}/invariants?sub=true"),
+            &format!("/v1/sessions/{session_id}/invariants?kind=SUB"),
             Value::Null,
             None,
         ),
     )
     .await;
-    assert_eq!(status, StatusCode::CONFLICT);
-    assert_eq!(body["error"]["code"], "NOT_IMPLEMENTED");
+    assert_eq!(status, StatusCode::OK);
+    let invariants = body["invariants"]
+        .as_array()
+        .expect("SUB invariants should be returned");
+    assert!(invariants.iter().all(|item| item["relation"] == "LESS_OR_EQUAL"));
 }
 
 #[tokio::test]
@@ -352,4 +364,90 @@ async fn raw_http_request(port: u16, method: &str, path: &str, token: Option<&st
         .await
         .expect("response should be read");
     String::from_utf8(response).expect("HTTP response should be UTF-8")
+}
+
+#[tokio::test]
+async fn place_boundedness_decides_each_place_and_reports_unknown_places() {
+    let model = TemporaryMercuryFile::new(
+        r#"
+        SPN Model ApiGrowth {
+            place Seed(tokens = 1);
+            place Sink;
+            timedTransition Gen(inputs = [Seed], outputs = [Seed, Sink], delay = 0.0);
+        }
+
+        main {
+        }
+        "#,
+    );
+    let app = test_router(None);
+    let load = load_model(&app, &model).await;
+    let session = load["session_id"].as_str().unwrap();
+    let get = |place: &str| {
+        request(
+            Method::GET,
+            &format!("/v1/sessions/{session}/places/{place}/boundedness"),
+            json!({}),
+            None,
+        )
+    };
+
+    let (status, seed) = json_response(&app, get("Seed")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(seed["bounded"], true);
+    assert_eq!(seed["status"], "BOUNDED");
+    assert_eq!(seed["rule"], "STUBBORN_OMEGA_TREE");
+    assert_eq!(seed["reference_ids"], json!(["R9"]));
+
+    let (status, sink) = json_response(&app, get("Sink")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!((sink["bounded"].clone(), sink["status"].clone()), (json!(false), json!("UNBOUNDED")));
+
+    let (status, missing) = json_response(&app, get("Nope")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(missing["error"]["code"], "PLACE_NOT_FOUND");
+}
+
+#[tokio::test]
+async fn transition_dead_reports_status_witness_and_unknown_transitions() {
+    let model = TemporaryMercuryFile::new(
+        r#"
+        SPN Model ApiDead {
+            place A(tokens = 1);
+            place B;
+            place C;
+            timedTransition Go(inputs = [A], outputs = [B], delay = 0.0);
+            timedTransition Then(inputs = [B], outputs = [A], delay = 0.0);
+            timedTransition Never(inputs = [C], outputs = [A], delay = 0.0);
+        }
+
+        main {
+        }
+        "#,
+    );
+    let app = test_router(None);
+    let load = load_model(&app, &model).await;
+    let session = load["session_id"].as_str().unwrap();
+    let get = |transition: &str| {
+        request(
+            Method::GET,
+            &format!("/v1/sessions/{session}/transitions/{transition}/dead"),
+            json!({}),
+            None,
+        )
+    };
+
+    let (status, then) = json_response(&app, get("Then")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(then["status"], "NOT_DEAD");
+    assert_eq!(then["witness"], json!(["Go"]));
+    assert_eq!(then["reference_ids"], json!(["R9"]));
+
+    let (status, never) = json_response(&app, get("Never")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!((never["dead"].clone(), never["status"].clone()), (json!(true), json!("DEAD")));
+
+    let (status, missing) = json_response(&app, get("Nope")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(missing["error"]["code"], "TRANSITION_NOT_FOUND");
 }

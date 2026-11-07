@@ -1,0 +1,42 @@
+# Build output and installed dependencies
+/target/
+/src-tauri/target/
+/dist/
+/node_modules/
+
+# Generated Tauri permission schemas
+/src-tauri/gen/schemas/
+
+# Generated Java bytecode
+/examples/java/out/
+/test-java/out/
+
+# Local agent/session state
+/.omo/
+/.serena/
+/.superpowers/
+
+# Technical reports, plans, and imported reference material
+/AGENTS.md
+/.specs/
+/CTL_*.md
+/RACON_AUDIT_ATUAL.md
+/docs/*
+/References/
+/ignore_Ideias_futuras/
+
+# Superseded visualizers; GraphTab and PetriNetGraph remain active
+/src/components/GraphViewer.jsx
+/src/components/CoverabilityViewer.jsx
+
+# Root-level sample/import scratch files
+/l1q1.pnt
+/model.pnt
+/linguagem.lang
+/racon_mercury_*.pnt
+/teste_mercury.m
+/test.txt
+/NEW_NAME
+
+# Legacy standalone Java test harness
+/test-java/

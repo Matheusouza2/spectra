@@ -1,0 +1,41 @@
+predicate for net:   0 BNA
+Conjunction nr:  1
+m + p11.WATER_OUTPUT      low =  1  upp = 1
+m + p10.WATER_INPUT       low =  1  upp = 1
+m + p9.SS_UNAVAILABLE    low =  0  upp = 0
+m + p8.SS_AVAILABLE      low =  1  upp = 1
+m + p7.OR_BUFFER         low =  2  upp = 2
+m + p6.OR                low =  1  upp = 1
+m + p5.MP2_STOPED        low =  0  upp = 0
+m + p4.MP2_RUNNING       low =  1  upp = 1
+m + p3.MP1_STOPED        low =  0  upp = 0
+m + p2.MP1_RUNNING       low =  1  upp = 1
+m + p1.IR_BUFFER         low =  0  upp = 0
+m + p0.IR                low =  3  upp = 3
+Conjunction nr:  2
+m + p11.WATER_OUTPUT      low =  1  upp = 1
+m + p10.WATER_INPUT       low =  1  upp = 1
+m + p9.SS_UNAVAILABLE    low =  0  upp = 0
+m + p8.SS_AVAILABLE      low =  1  upp = 1
+m + p7.OR_BUFFER         low =  2  upp = 2
+m + p6.OR                low =  1  upp = 1
+m + p5.MP2_STOPED        low =  0  upp = 0
+m + p4.MP2_RUNNING       low =  1  upp = 1
+m + p3.MP1_STOPED        low =  1  upp = 1
+m + p2.MP1_RUNNING       low =  0  upp = 0
+m + p1.IR_BUFFER         low =  0  upp = 0
+m + p0.IR                low =  3  upp = 3
+Conjunction nr:  3
+m + p11.WATER_OUTPUT      low =  1  upp = 1
+m + p10.WATER_INPUT       low =  1  upp = 1
+m + p9.SS_UNAVAILABLE    low =  0  upp = 0
+m + p8.SS_AVAILABLE      low =  1  upp = 1
+m + p7.OR_BUFFER         low =  2  upp = 2
+m + p6.OR                low =  1  upp = 1
+m + p5.MP2_STOPED        low =  1  upp = 1
+m + p4.MP2_RUNNING       low =  0  upp = 0
+m + p3.MP1_STOPED        low =  1  upp = 1
+m + p2.MP1_RUNNING       low =  0  upp = 0
+m + p1.IR_BUFFER         low =  0  upp = 0
+m + p0.IR                low =  3  upp = 3
+@

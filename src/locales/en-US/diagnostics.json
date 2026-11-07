@@ -1,0 +1,8 @@
+{
+  "kicker": "Local log",
+  "title": "Application diagnostics",
+  "refresh": "Refresh",
+  "location": "File racon.log · showing up to 2,000 recent events",
+  "readError": "Could not read the logs: {error}",
+  "empty": "No events recorded yet."
+}

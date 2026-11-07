@@ -1,0 +1,8 @@
+{
+  "status.complete": "Os {total} valores estão preenchidos.",
+  "status.partial": "{count} de {total} valores. Próximo: {next}.",
+  "status.tooMany": "Valores demais: esperado {expected}, recebido {got}.",
+  "status.invalid": "\"{value}\" não é um valor válido para {name}.",
+  "invalidShort": "inválido",
+  "missing": "ainda não definido"
+}

@@ -1,0 +1,22 @@
+{
+  "loadFailed": "Falha ao carregar matriz: {error}",
+  "selectFile": "Selecione um arquivo .pnt para visualizar a matriz de incidência.",
+  "calculating": "Calculando matriz de incidência...",
+  "unavailable": "Matriz de incidência não disponível.",
+  "calculate": "Calcular Matriz",
+  "title": "Matriz de Incidência (Post − Pre)",
+  "legend": "Legenda da matriz",
+  "positive": "Positivo (produção)",
+  "negative": "Negativo (consumo)",
+  "zero": "Zero (sem efeito)",
+  "cellDesc": "Cada célula indica a variação de tokens no lugar (linha) ao disparar a transição (coluna).",
+  "transitionTitle": "Transição {name}",
+  "initialMarking": "Marcação inicial",
+  "placeTitle": "Lugar {name}",
+  "empty": "Matriz vazia (sem lugares ou transições).",
+  "stateEquation": "Equação de Estado",
+  "stateEquationDesc": "Onde M é a marcação atual, W é a matriz de incidência e σ é o vetor de disparo (cada componente indica quantas vezes a transição dispara).",
+  "example": "Exemplo (um disparo):",
+  "expand": "Expandir a matriz em tela cheia",
+  "collapse": "Fechar"
+}

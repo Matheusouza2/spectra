@@ -1,0 +1,29 @@
+SPN Model{
+    place IR( tokens= 3 );
+    place IR_BUFFER;
+    place MP1_RUNNING( tokens= 1 );
+    place MP1_STOPED;
+    place MP2_RUNNING( tokens= 1 );
+    place MP2_STOPED;
+    place OR( tokens= 1 );
+    place OR_BUFFER( tokens= 2 );
+    place SS_AVAILABLE( tokens= 1 );
+    place SS_UNAVAILABLE;
+    place WATER_INPUT( tokens= 1 );
+    place WATER_OUTPUT( tokens= 1 );
+    immediateTransition MP1_IR_EMPTY( inputs = [MP1_RUNNING], outputs = [MP1_STOPED], inhibitors = [IR] );
+    immediateTransition MP2_IR_EMPTY( inputs = [MP2_RUNNING], outputs = [MP2_STOPED], inhibitors = [IR] );
+    immediateTransition OR_FULL_STOP_MP1( inputs = [MP1_RUNNING], outputs = [MP1_STOPED], inhibitors = [OR_BUFFER] );
+    immediateTransition OR_FULL_STOP_MP2( inputs = [MP2_RUNNING], outputs = [MP2_STOPED], inhibitors = [OR_BUFFER] );
+    immediateTransition SS_DOWN( inputs = [MP1_RUNNING, MP2_RUNNING], outputs = [MP1_STOPED, MP2_STOPED], inhibitors = [SS_AVAILABLE] );
+    timedTransition MP1_START( inputs = [MP1_STOPED, SS_AVAILABLE, OR_BUFFER, IR], outputs = [MP1_RUNNING, SS_AVAILABLE, OR_BUFFER, IR], delay = 0.0 );
+    timedTransition MP1_STOP( inputs = [MP1_RUNNING], outputs = [MP1_STOPED], delay = 0.0 );
+    timedTransition MP1_WATER_TRANSFER( inputs = [IR, MP1_RUNNING, OR_BUFFER], outputs = [IR_BUFFER, MP1_RUNNING, OR], delay = 0.0 );
+    timedTransition MP2_START( inputs = [MP2_STOPED, SS_AVAILABLE, OR_BUFFER, IR], outputs = [MP2_RUNNING, SS_AVAILABLE, OR_BUFFER, IR], delay = 0.0 );
+    timedTransition MP2_STOP( inputs = [MP2_RUNNING], outputs = [MP2_STOPED], delay = 0.0 );
+    timedTransition MP2_WATER_TRANSFER( inputs = [OR_BUFFER, MP2_RUNNING, IR], outputs = [OR, MP2_RUNNING, IR_BUFFER], delay = 0.0 );
+    timedTransition SS_FAILURE( inputs = [SS_AVAILABLE], outputs = [SS_UNAVAILABLE], delay = 0.0 );
+    timedTransition SS_RECOVER( inputs = [SS_UNAVAILABLE], outputs = [SS_AVAILABLE], delay = 0.0 );
+    timedTransition WATER_IN_IR( inputs = [WATER_INPUT, IR_BUFFER], outputs = [IR, WATER_INPUT], delay = 0.0 );
+    timedTransition WATER_OUT( inputs = [OR, WATER_OUTPUT], outputs = [OR_BUFFER, WATER_OUTPUT], delay = 0.0 );
+}
