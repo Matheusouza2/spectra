@@ -272,7 +272,8 @@ fn frontend_ctl_examples_are_parseable() {
     let examples = [
         "existe caminho eventualmente P1 = 1",
         "para todos os caminhos sempre P1 >= 0",
-        "existe caminho até (P1 = 1) e (P2 = 0)",
+        "existe caminho (P1 = 1) até (P2 = 0)",
+        "para todo caminho (P1 >= 1) até (P2 = 0)",
     ];
 
     for example in examples {
@@ -517,4 +518,114 @@ fn enabled_rejects_unknown_transitions_and_empty_lists() {
         other => panic!("expected UnknownTransition, got {other:?}"),
     }
     assert!(parse_ctl_query("exists path eventually enabled()", &net).is_err());
+}
+
+/// `exists path (φ) until (ψ)` is the documented form of E[φ U ψ]; `for all paths (φ) until (ψ)` is A[φ U ψ].
+/// The "and" of the older prefix form (`exists path until (φ) and (ψ)`) is only a separator and is no longer taught.
+#[test]
+fn test_parse_quantified_infix_until_in_both_languages() {
+    let net = make_test_net();
+    for query in [
+        "exists path (P1 = 1) until (P2 = 0)",
+        "exists (P1 = 1) until (P2 = 0)",
+        "existe caminho (P1 = 1) até (P2 = 0)",
+        "existe (P1 = 1) até (P2 = 0)",
+        "exists path P1 = 1 until P2 = 0",
+    ] {
+        match &parse_ctl_query(query, &net).unwrap_or_else(|e| panic!("{query}: {e}")) {
+            CTLFormula::EU(_, _) => {}
+            other => panic!("{query}: expected EU, got {other:?}"),
+        }
+    }
+    for query in [
+        "for all paths (P1 = 1) until (P2 = 0)",
+        "para todo caminho (P1 = 1) até (P2 = 0)",
+        "para todos os caminhos (P1 = 1) até (P2 = 0)",
+    ] {
+        match &parse_ctl_query(query, &net).unwrap_or_else(|e| panic!("{query}: {e}")) {
+            CTLFormula::AU(_, _) => {}
+            other => panic!("{query}: expected AU, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn test_infix_until_keeps_a_compound_left_side_in_parentheses() {
+    let net = make_test_net();
+    match &parse_ctl_query("existe caminho (P1 = 1 e P2 = 0) até (P1 = 0)", &net).unwrap() {
+        CTLFormula::EU(left, _) => assert!(matches!(**left, CTLFormula::And(_, _))),
+        other => panic!("expected EU with a conjunction on the left, got {other:?}"),
+    }
+}
+
+#[test]
+fn test_forall_until_with_comparison_on_the_left() {
+    let net = make_test_net();
+    for query in [
+        "para todo caminho (P1 >= 1) até (P2 = 0)",
+        "para todo caminho (P1 >= 1) ate (P2 = 0)",
+        "for all paths (P1 >= 1) until (P2 = 0)",
+    ] {
+        assert!(matches!(parse_ctl_query(query, &net).unwrap_or_else(|e| panic!("{query}: {e}")), CTLFormula::AU(_, _)), "{query}");
+    }
+}
+
+#[test]
+fn deadlock_atom_and_quoted_names_parse() {
+    let net = make_test_net();
+    for q in ["exists path eventually deadlock", "existe caminho eventualmente bloqueio", "for all paths always not deadlock"] {
+        parse_ctl_query(q, &net).unwrap_or_else(|e| panic!("{q}: {e:?}"));
+    }
+    // Reserved words become places when quoted or followed by a comparison.
+    for q in ["exists path eventually \"P1\" = 1", "exists path eventually `P0` >= 1"] {
+        parse_ctl_query(q, &net).unwrap_or_else(|e| panic!("{q}: {e:?}"));
+    }
+    assert!(parse_dsl("exists path eventually B = 1").is_ok());
+    assert!(parse_dsl("exists path eventually `x` > 0").is_ok());
+    assert!(parse_dsl("exists path eventually \"unterminated").is_err());
+}
+
+fn linear(formula: &CTLFormula) -> (Vec<(u32, i64)>, ComparisonOp, i64) {
+    match formula {
+        CTLFormula::AtomicProposition(p) => (
+            p.terms.iter().map(|t| (t.place_id.0, t.coefficient)).collect(),
+            p.operator,
+            p.constant,
+        ),
+        other => panic!("expected atom, got {other:?}"),
+    }
+}
+
+#[test]
+fn linear_arithmetic_atoms_are_normalised() {
+    let net = make_test_net();
+    let f = parse_ctl_query("P0 + P1 >= 2", &net).unwrap();
+    assert_eq!(linear(&f), (vec![(0, 1), (1, 1)], ComparisonOp::Ge, 2));
+    // right-hand places move to the left
+    let f = parse_ctl_query("P0 <= P1", &net).unwrap();
+    assert_eq!(linear(&f), (vec![(0, 1), (1, -1)], ComparisonOp::Le, 0));
+    let f = parse_ctl_query("2*P0 - P1 = 3 + 1", &net).unwrap();
+    assert_eq!(linear(&f), (vec![(0, 2), (1, -1)], ComparisonOp::Eq, 4));
+    let f = parse_ctl_query("P0 * 3 > 1", &net).unwrap();
+    assert_eq!(linear(&f), (vec![(0, 3)], ComparisonOp::Gt, 1));
+    // constants on the left, repeated places merge, cancelled places fold to a constant
+    let f = parse_ctl_query("1 <= P0 + P0", &net).unwrap();
+    assert_eq!(linear(&f), (vec![(0, -2)], ComparisonOp::Le, -1));
+    assert!(matches!(parse_ctl_query("P0 - P0 = 0", &net).unwrap(), CTLFormula::True));
+    assert!(matches!(parse_ctl_query("P0 - P0 > 0", &net).unwrap(), CTLFormula::False));
+    // inside temporal operators and boolean connectives
+    parse_ctl_query("exists path eventually (P0 + P1 >= 2 and P2 <= P0)", &net).unwrap();
+    parse_ctl_query("existe caminho eventualmente P0 + P1 >= 2", &net).unwrap();
+}
+
+#[test]
+fn nonlinear_and_malformed_arithmetic_is_rejected() {
+    let net = make_test_net();
+    assert!(parse_ctl_query("P0 * P1 >= 1", &net).is_err());
+    assert!(parse_ctl_query("P0 + >= 1", &net).is_err());
+    assert!(parse_ctl_query("P0 + P1", &net).is_err());
+    assert!(parse_ctl_query("P0 + Nope >= 1", &net).is_err());
+    // legacy forms keep working
+    assert_atomic_prop(&parse_ctl_query("P1 >= 3", &net).unwrap(), 1, ComparisonOp::Ge, 3);
+    parse_ctl_query("-(P0 = 1)", &net).unwrap();
 }

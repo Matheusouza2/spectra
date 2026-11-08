@@ -17,24 +17,26 @@ export function useReductionFlag(scope, option) {
 
 /**
  * Opt-in reductions for a query. `options` is a list of
- * `{ id, checked, onChange, disabled, disabledReason }`; labels and hints come from `reduction.<id>.*`.
+ * `{ id, checked, onChange, disabled }` (disabled options are hidden); labels and hints come from `reduction.<id>.*`.
  */
 export default function ReductionOptions({ options }) {
   const { t } = useI18n();
+  // An option the net cannot use is not offered at all; with none left the group disappears.
+  const available = options.filter((option) => !option.disabled);
+  if (available.length === 0) return null;
   return (
     <fieldset className="ro">
       <legend>{t('reduction.legend')}</legend>
-      {options.map((option) => (
-        <label key={option.id} className={`ro-item${option.disabled ? ' off' : ''}`} title={option.disabled ? option.disabledReason : undefined}>
+      {available.map((option) => (
+        <label key={option.id} className="ro-item">
           <input
             type="checkbox"
-            checked={Boolean(option.checked) && !option.disabled}
-            disabled={option.disabled}
+            checked={Boolean(option.checked)}
             onChange={(event) => option.onChange(event.target.checked)}
           />
           <span>
             <strong>{t(`reduction.${option.id}.label`)}</strong>
-            <small>{option.disabled && option.disabledReason ? option.disabledReason : t(`reduction.${option.id}.hint`)}</small>
+            <small>{t(`reduction.${option.id}.hint`)}</small>
           </span>
         </label>
       ))}

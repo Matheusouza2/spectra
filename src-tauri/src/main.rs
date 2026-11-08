@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod graph_cache;
+
 use racon_core::execution::{AnalysisConfig, AnalysisContext};
 use racon_core::graph::NodeId;
 use racon_core::marking::TokenValue;
@@ -14,7 +16,7 @@ use racon_invariants::{
     InvariantEngineImpl, p_invariant_basis, t_invariant_basis, StateEquationVerdict,
 };
 use racon_parsers::{MercuryParser, MercuryParserImpl, MercuryParserConfig, PntParser, PntParserImpl, PntParserConfig};
-use racon_reachability::{ReachabilityConfig, ReachabilityEngine, ReachabilityEngineImpl};
+use racon_reachability::{ReachabilityConfig, ReachabilityEngine, ReachabilityEngineImpl, ReachabilityGraph};
 use racon_ctl::{AtomicPredicate, CTLConfig, CTLEngine, CTLEngineImpl, CTLFormula, ComparisonOp};
 use racon_ctl_dsl::{parse_ctl_query, DslParseError};
 use racon_structural::topology::StructuralAnalyzer;
@@ -24,6 +26,7 @@ use racon_evidence::{build_all_evidence, MathematicalEvidence};
 use serde::{Deserialize, Serialize};
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -145,13 +148,23 @@ fn ensure_algorithm_allowed(
     objective: racon_reduction::catalog::Objective,
     algorithm: GraphAlgorithm,
     stubborn: bool,
+    symmetry: bool,
 ) -> Result<(), String> {
     use racon_reduction::catalog::{validate, ConfigRequest, NetClass};
     let report = validate(&ConfigRequest {
         objective,
         mode: "manual".into(),
         exploration: Some(algorithm.catalog_id(objective).to_owned()),
-        reductions: if stubborn { vec!["partial_order_stubborn".to_owned()] } else { Vec::new() },
+        reductions: {
+            let mut selected = Vec::new();
+            if stubborn {
+                selected.push("partial_order_stubborn".to_owned());
+            }
+            if symmetry {
+                selected.push("symmetry_reduction".to_owned());
+            }
+            selected
+        },
         net_class: if net.is_extended() { NetClass::ExtendedPt } else { NetClass::PtWeighted },
     });
     if report.is_valid() {
@@ -175,6 +188,9 @@ pub struct GraphGenerationConfig {
     /// Apply the (experimental) stubborn-set reduction during exploration.
     #[serde(default)]
     pub stubborn: bool,
+    /// Explore one canonical marking per symmetry orbit (Junttila 2003).
+    #[serde(default)]
+    pub symmetry: bool,
     /// Apply the query-dependent structural rules A-I (Bønneland et al. 2019)
     /// before searching a Bad State.
     #[serde(default)]
@@ -189,6 +205,7 @@ impl Default for GraphGenerationConfig {
             memory_limit_mb: 1_024,
             algorithm: GraphAlgorithm::Default,
             stubborn: false,
+            symmetry: false,
             structural_rules: false,
         }
     }
@@ -425,7 +442,23 @@ pub struct CTLCheckResult {
     pub exact_state_space: bool,
     pub witness: Option<CTLPathResult>,
     pub counterexample: Option<CTLPathResult>,
+    /// The states where the formula holds (id and marking), capped at `CTL_LISTED_STATES`.
+    #[serde(default)]
+    pub states: Vec<CTLStateEntry>,
+    #[serde(default)]
+    pub states_truncated: bool,
+    #[serde(default)]
+    pub place_names: Vec<String>,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct CTLStateEntry {
+    pub id: usize,
+    pub marking: Vec<TokenDto>,
+}
+
+/// More satisfying states than this are counted but not listed.
+const CTL_LISTED_STATES: usize = 1_000;
 
 #[derive(Serialize, Deserialize)]
 pub struct CTLParseErrorResult {
@@ -789,6 +822,21 @@ fn parse_pnt_file(file_path: &str) -> Result<PetriNet, String> {
     let net = parser.parse_string(&content).map_err(|e| e.to_string())?;
     validate_petri_net(&net).map_err(|e| format!("Formal Petri-net validation failed: {e}"))?;
     Ok(net)
+}
+
+/// The saved reachability graph of the net in `file_path`. Nothing is explored here:
+/// the graph exists only after it was generated from the Graphs tab.
+fn cached_reachability(file_path: &str, net: &PetriNet) -> Result<Arc<ReachabilityGraph>, String> {
+    graph_cache::load_reachability(file_path, &Arc::new(net.clone()))
+}
+
+fn cached_coverability(file_path: &str, net: &PetriNet) -> Result<Arc<racon_coverability::CoverabilityGraph>, String> {
+    graph_cache::load_coverability(file_path, &Arc::new(net.clone()))
+}
+
+#[tauri::command]
+fn get_graph_cache_status(file_path: String) -> graph_cache::GraphCacheStatus {
+    graph_cache::status(&file_path)
 }
 
 fn marking_distance(left: &Marking, right: &Marking) -> u128 {
@@ -1157,19 +1205,10 @@ fn check_marking_reachability_impl(
 
     let ctx = analysis_context_for_graph(config);
     if config.stubborn {
-        ensure_algorithm_allowed(&net, racon_reduction::catalog::Objective::Reachability, config.algorithm, true)?;
+        ensure_algorithm_allowed(&net, racon_reduction::catalog::Objective::Reachability, config.algorithm, true, false)?;
         return check_marking_reachability_stubborn(&net, &target, config, &ctx);
     }
-    let engine = ReachabilityEngineImpl {
-        config: ReachabilityConfig {
-            max_nodes: config.max_nodes,
-            max_edges: config.max_edges,
-            ..ReachabilityConfig::default()
-        },
-    };
-    let graph = engine
-        .build_complete(&net, &ctx)
-        .map_err(|e| format!("Reachability analysis failed: {}", e))?;
+    let graph = cached_reachability(&file_path, &net)?;
 
     let state_count = graph.node_count();
 
@@ -1273,16 +1312,7 @@ fn compute_behavioral_properties_impl(
     let ctx = analysis_context_for_graph(config);
     // Always the full graph: persistence, GFC and dynamic conflicts are not
     // preserved by stubborn-set or other reductions.
-    let engine = ReachabilityEngineImpl {
-        config: ReachabilityConfig {
-            max_nodes: config.max_nodes,
-            max_edges: config.max_edges,
-            ..ReachabilityConfig::default()
-        },
-    };
-    let graph = engine
-        .build_complete(&net, &ctx)
-        .map_err(|e| format!("Exact reachability graph required: {}", e))?;
+    let graph = cached_reachability(&file_path, &net)?;
     if !graph.is_exact() {
         return Err("Exact reachability graph required: the state space is not exact".into());
     }
@@ -1522,7 +1552,7 @@ async fn check_marking_coverability(
 fn check_marking_coverability_impl(
     file_path: String,
     marking: Vec<i32>,
-    config: GraphGenerationConfig,
+    _config: GraphGenerationConfig,
 ) -> Result<MarkingCoverabilityResult, String> {
     let net = parse_pnt_file(&file_path)?;
     if net.is_extended() {
@@ -1535,12 +1565,7 @@ fn check_marking_coverability_impl(
         return Err("Token counts must not be negative".into());
     }
     let target = marking_from_i32(&marking);
-    let ctx = analysis_context_for_graph(config);
-    let graph = CoverabilityEngineImpl {
-        config: CoverabilityConfig { max_nodes: config.max_nodes, max_edges: config.max_edges },
-    }
-    .build_complete(&net, CoverabilityStrategy::KarpMiller, &ctx)
-    .map_err(|e| format!("Geração do grafo de cobertura interrompida: {e}"))?;
+    let graph = cached_coverability(&file_path, &net)?;
 
     // M is coverable iff some node of the (complete) Karp-Miller graph is >= M
     // place by place, with ω above every finite count.
@@ -1644,19 +1669,10 @@ fn compute_distances_impl(
     file_path: String,
     from: Option<Vec<i32>>,
     to: Option<Vec<i32>>,
-    config: GraphGenerationConfig,
+    _config: GraphGenerationConfig,
 ) -> Result<DistanceResult, String> {
     let net = parse_pnt_file(&file_path)?;
-    let ctx = analysis_context_for_graph(config);
-    let graph = ReachabilityEngineImpl {
-        config: ReachabilityConfig {
-            max_nodes: config.max_nodes,
-            max_edges: config.max_edges,
-            ..ReachabilityConfig::default()
-        },
-    }
-    .build_complete(&net, &ctx)
-    .map_err(|e| format!("Exact reachability graph required: {e}"))?;
+    let graph = cached_reachability(&file_path, &net)?;
 
     let state_of = |marking: &[i32], label: &str| -> Result<usize, String> {
         if marking.len() != net.place_count() {
@@ -1840,22 +1856,13 @@ fn shortest_circuit_through(adj: &Adjacency, start: usize) -> Option<usize> {
 fn compute_circuits_impl(
     file_path: String,
     request: CircuitsRequest,
-    config: GraphGenerationConfig,
+    _config: GraphGenerationConfig,
 ) -> Result<CircuitsResult, String> {
     if !["shortest", "longest", "all"].contains(&request.mode.as_str()) {
         return Err(format!("Unknown circuit mode: {}", request.mode));
     }
     let net = parse_pnt_file(&file_path)?;
-    let ctx = analysis_context_for_graph(config);
-    let graph = ReachabilityEngineImpl {
-        config: ReachabilityConfig {
-            max_nodes: config.max_nodes,
-            max_edges: config.max_edges,
-            ..ReachabilityConfig::default()
-        },
-    }
-    .build_complete(&net, &ctx)
-    .map_err(|e| format!("Exact reachability graph required: {e}"))?;
+    let graph = cached_reachability(&file_path, &net)?;
 
     let count = graph.node_count();
     let adj: Adjacency = (0..count)
@@ -2056,7 +2063,7 @@ fn build_predicate_impl(
     kind: String,
     transitions: Vec<String>,
     states: Vec<usize>,
-    config: GraphGenerationConfig,
+    _config: GraphGenerationConfig,
 ) -> Result<PredicateResult, String> {
     let net = parse_pnt_file(&file_path)?;
     // (number written in the .pdc, label shown, place index, low, upp)
@@ -2096,12 +2103,7 @@ fn build_predicate_impl(
             if states.len() > 500 {
                 return Err("Choose at most 500 states".into());
             }
-            let ctx = analysis_context_for_graph(config);
-            let graph = ReachabilityEngineImpl {
-                config: ReachabilityConfig { max_nodes: config.max_nodes, max_edges: config.max_edges, ..ReachabilityConfig::default() },
-            }
-            .build_complete(&net, &ctx)
-            .map_err(|e| format!("Exact reachability graph required: {e}"))?;
+            let graph = cached_reachability(&file_path, &net)?;
             for (index, &state) in states.iter().enumerate() {
                 if state >= graph.node_count() {
                     return Err(format!("State M{state} does not exist: the graph has {} states", graph.node_count()));
@@ -2317,54 +2319,31 @@ fn required_initial_properties_impl(file_path: String) -> Result<RequiredInitial
         )
         .ok(),
     };
+    // The full Karp-Miller graph and the reachability graph are never built here: they come from
+    // the cache, which the Graphs tab fills when the user generates the graph.
     let bounded = match (structurally_bounded, verdict.and_then(|v| v.as_bool())) {
         (Some(true), _) => Some(true),
         (_, Some(value)) => Some(value),
-        _ => {
-            let coverability_engine = CoverabilityEngineImpl {
-                config: CoverabilityConfig {
-                    max_nodes: GraphGenerationConfig::default().max_nodes,
-                    max_edges: GraphGenerationConfig::default().max_edges,
-                },
-            };
-            coverability_engine
-                .build_complete(&net, CoverabilityStrategy::KarpMiller, &context)
-                .ok()
-                .and_then(|graph| graph.bounded_status())
-        }
+        _ => cached_coverability(&file_path, &net).ok().and_then(|graph| graph.bounded_status()),
     };
-
-    let reachability_engine = ReachabilityEngineImpl {
-        config: ReachabilityConfig {
-            max_nodes: GraphGenerationConfig::default().max_nodes,
-            max_edges: GraphGenerationConfig::default().max_edges,
-            ..ReachabilityConfig::default()
-        },
-    };
-    // An unbounded net has an infinite reachability set: skip the exploration
-    // that could only end at the node limit.
-    let reachability = if bounded == Some(false) {
-        None
-    } else {
-        Some(reachability_engine.build_complete(&net, &context))
-    };
+    let reachability = if bounded == Some(false) { None } else { cached_reachability(&file_path, &net).ok() };
     // An unbounded net is not structurally bounded either (SB implies B for every M0).
     let structurally_bounded = if bounded == Some(false) { Some(false) } else { structurally_bounded };
     // A fully explored finite reachability graph is itself a proof of
     // boundedness; this is the only conclusive route for extended nets.
     let bounded = match (&reachability, bounded) {
-        (Some(Ok(graph)), None) if graph.is_exact() => Some(true),
+        (Some(graph), None) if graph.is_exact() => Some(true),
         (_, other) => other,
     };
     let state_count = match &reachability {
-        Some(Ok(graph)) if graph.is_exact() => Some(graph.node_count()),
+        Some(graph) if graph.is_exact() => Some(graph.node_count()),
         _ => None,
     };
-    let (live, safe, reachability_warning) = match reachability {
+    let (live, safe, reachability_warning) = match &reachability {
         // Unbounded => not 1-bounded, hence not safe and not live-and-safe; only L stays undecided.
-        None => (None, Some(false), Some("A rede é ilimitada: o grafo de alcançabilidade é infinito, então L não é calculado.".into())),
-        Some(Ok(graph)) if graph.is_exact() => {
-            let live = ExpertSystem::is_live(&net, &graph);
+        None if bounded == Some(false) => (None, Some(false), Some("A rede é ilimitada: o grafo de alcançabilidade é infinito, então L não é calculado.".into())),
+        Some(graph) if graph.is_exact() => {
+            let live = ExpertSystem::is_live(&net, graph);
             let safe = (0..graph.node_count()).all(|index| {
                 graph
                     .marking(NodeId(index as u32))
@@ -2374,8 +2353,9 @@ fn required_initial_properties_impl(file_path: String) -> Result<RequiredInitial
             });
             (Some(live), Some(safe), None)
         }
-        Some(Ok(_)) => (None, None, Some("O espaço de estados não é exato; L e L&S continuam sem resultado.".into())),
-        Some(Err(error)) => (None, None, Some(format!("Não foi possível concluir o espaço de estados para L e L&S: {error}"))),
+        Some(_) => (None, None, Some("O espaço de estados não é exato; L e L&S continuam sem resultado.".into())),
+        // No graph yet: L, S and L&S wait for the Graphs tab.
+        None => (None, None, None),
     };
     let live_and_safe = match (live, safe) {
         (Some(false), _) | (_, Some(false)) => Some(false),
@@ -2441,21 +2421,13 @@ fn check_cycle_fairness_impl(
     file_path: String,
     nodes: Vec<usize>,
     transitions: Vec<usize>,
-    config: GraphGenerationConfig,
+    _config: GraphGenerationConfig,
 ) -> Result<FairnessResult, String> {
     if nodes.len() < 2 || nodes.len() != transitions.len() + 1 || nodes.first() != nodes.last() {
         return Err("cycle must be closed and contain one transition per edge".into());
     }
     let net = parse_pnt_file(&file_path)?;
-    let ctx = analysis_context_for_graph(config);
-    let engine = ReachabilityEngineImpl {
-        config: ReachabilityConfig {
-            max_nodes: config.max_nodes,
-            max_edges: config.max_edges,
-            ..ReachabilityConfig::default()
-        },
-    };
-    let graph = engine.build_complete(&net, &ctx).map_err(|e| e.to_string())?;
+    let graph = cached_reachability(&file_path, &net)?;
     let mut fired = HashSet::new();
     for i in 0..transitions.len() {
         let source = NodeId(nodes[i] as u32);
@@ -2548,13 +2520,22 @@ fn get_reachability_graph_impl(
         racon_reduction::catalog::Objective::Reachability,
         config.algorithm,
         config.stubborn,
+        config.symmetry,
     )?;
     // (markings, labelled edges) of the chosen exploration, in discovery order.
-    let (markings, raw_edges): (Vec<Marking>, Vec<(usize, usize, usize)>) = if config.stubborn {
-        // Experimental, deadlock-preserving only (catalogue: partial_order_stubborn).
+    let (markings, raw_edges): (Vec<Marking>, Vec<(usize, usize, usize)>) = if config.stubborn || config.symmetry {
+        // Experimental reductions; what each preserves is in the catalogue
+        // (partial_order_stubborn, symmetry_reduction).
+        let mut kinds = Vec::new();
+        if config.symmetry {
+            kinds.push(racon_reduction::ReductionKind::Symmetry);
+        }
+        if config.stubborn {
+            kinds.push(racon_reduction::ReductionKind::Stubborn);
+        }
         let reduced = racon_reduction::ReducedReachabilityGraph::build(
             &net,
-            &[racon_reduction::ReductionKind::Stubborn],
+            &kinds,
             &racon_reduction::SymmetryOptions::default(),
             racon_reduction::ReducedExplorationConfig {
                 max_nodes: config.max_nodes,
@@ -2572,11 +2553,21 @@ fn get_reachability_graph_impl(
         }
         (markings, edges)
     } else {
-        let graph = match config.algorithm {
-            GraphAlgorithm::ReachabilityDfs => engine.build_complete_dfs(&net, &ctx),
-            _ => engine.build_complete(&net, &ctx),
-        }
-        .map_err(|e| format!("Geração do grafo de alcançabilidade interrompida: {e}"))?;
+        // One exploration per net: a saved graph is reused, a new one is saved when it is complete.
+        let graph: Arc<ReachabilityGraph> = match cached_reachability(&file_path, &net) {
+            Ok(saved) => saved,
+            Err(_) => {
+                let built = match config.algorithm {
+                    GraphAlgorithm::ReachabilityDfs => engine.build_complete_dfs(&net, &ctx),
+                    _ => engine.build_complete(&net, &ctx),
+                }
+                .map_err(|e| format!("Geração do grafo de alcançabilidade interrompida: {e}"))?;
+                if built.is_exact() {
+                    graph_cache::store_reachability(&file_path, &built)?;
+                }
+                Arc::new(built)
+            }
+        };
         (
             graph.nodes.iter().map(|n| n.marking.clone()).collect(),
             graph
@@ -2711,7 +2702,7 @@ fn get_coverage_tree_impl(
             max_edges: config.max_edges,
         },
     };
-    ensure_algorithm_allowed(&net, racon_reduction::catalog::Objective::Coverability, config.algorithm, config.stubborn)?;
+    ensure_algorithm_allowed(&net, racon_reduction::catalog::Objective::Coverability, config.algorithm, config.stubborn, false)?;
     if config.algorithm == GraphAlgorithm::CoverabilityMincov {
         return Err("O MinCov produz o conjunto mínimo de cobertura, não uma árvore; use o comando do conjunto de cobertura.".into());
     }
@@ -2719,9 +2710,19 @@ fn get_coverage_tree_impl(
         GraphAlgorithm::CoverabilityFinkelLegacy => CoverabilityStrategy::FinkelMinimalCoverability,
         _ => CoverabilityStrategy::KarpMiller,
     };
-    let graph = engine
-        .build_complete(&net, strategy, &ctx)
-        .map_err(|e| format!("Geração da árvore de cobertura interrompida: {e}"))?;
+    // One construction per net: the Karp-Miller tree is saved and reused.
+    let graph: Arc<racon_coverability::CoverabilityGraph> = match (strategy, cached_coverability(&file_path, &net)) {
+        (CoverabilityStrategy::KarpMiller, Ok(saved)) => saved,
+        _ => {
+            let built = engine
+                .build_complete(&net, strategy, &ctx)
+                .map_err(|e| format!("Geração da árvore de cobertura interrompida: {e}"))?;
+            if strategy == CoverabilityStrategy::KarpMiller {
+                graph_cache::store_coverability(&file_path, &built)?;
+            }
+            Arc::new(built)
+        }
+    };
 
     const DISPLAY_NODE_LIMIT: usize = 1_000;
     const DISPLAY_EDGE_LIMIT: usize = 5_000;
@@ -2833,23 +2834,16 @@ fn check_bad_states_impl(
         return Err("UNSUPPORTED: as regras estruturais A-I não cobrem transições imediatas.".into());
     }
     if config.stubborn {
-        ensure_algorithm_allowed(&net, racon_reduction::catalog::Objective::Reachability, config.algorithm, true)?;
+        ensure_algorithm_allowed(&net, racon_reduction::catalog::Objective::Reachability, config.algorithm, true, false)?;
     }
     if config.stubborn || config.structural_rules {
         return Ok(check_bad_states_stubborn(&net, &definitions, algebraic, config, &ctx));
     }
     let needs_exact = algebraic.iter().any(|result| !result.proven_unreachable);
-    let exact_engine = ReachabilityEngineImpl {
-        config: ReachabilityConfig {
-            max_nodes: config.max_nodes,
-            max_edges: config.max_edges,
-            ..ReachabilityConfig::default()
-        },
-    };
-    let exact_report = needs_exact.then(|| exact_engine
-        .build_complete(&net, &ctx)
-        .ok()
-        .and_then(|graph| PropertyEngineImpl::default().evaluate_bad_states(&net, &property_definitions, &graph, &ctx).ok()))
+    // Exact check on the saved graph; without one, only the P-invariant proofs apply.
+    let exact_report = needs_exact
+        .then(|| cached_reachability(&file_path, &net).ok()
+            .and_then(|graph| PropertyEngineImpl::default().evaluate_bad_states(&net, &property_definitions, &graph, &ctx).ok()))
         .flatten();
 
     let mut safe = Some(true);
@@ -3045,42 +3039,11 @@ async fn get_analysis_evidence(file_path: String) -> Result<Vec<MathematicalEvid
         let Some(invariants) = compute_invariant_analysis(&net).ok() else {
             return Ok(Vec::new());
         };
-        // Behavioural evidence (B, DSt, DTr, REV, L, L&S, DCF) needs real state-space
-        // data; without it every one of them would be reported as inconclusive.
-        let config = GraphGenerationConfig::default();
-        let context = analysis_context_for_graph(config);
-        // Karp-Miller is only valid for plain P/T nets and always terminates.
-        let coverability = if net.is_extended() {
-            None
-        } else {
-            CoverabilityEngineImpl {
-                config: CoverabilityConfig {
-                    max_nodes: config.max_nodes,
-                    max_edges: config.max_edges,
-                },
-            }
-            .build_complete(&net, CoverabilityStrategy::KarpMiller, &context)
-            .ok()
-        };
-        let known_unbounded = coverability
-            .as_ref()
-            .and_then(|graph| graph.bounded_status())
-            == Some(false);
-        // An infinite reachability set cannot be enumerated; skip it.
-        let graph = if known_unbounded {
-            None
-        } else {
-            ReachabilityEngineImpl {
-                config: ReachabilityConfig {
-                    max_nodes: config.max_nodes,
-                    max_edges: config.max_edges,
-                    ..ReachabilityConfig::default()
-                },
-            }
-            .build_complete(&net, &context)
-            .ok()
-        };
-        Ok(build_all_evidence(&net, &structural, &invariants, graph.as_ref(), coverability.as_ref()))
+        // Behavioural evidence (B, DSt, DTr, REV, L, L&S, DCF) needs real state-space data.
+        // It is read from the saved graphs; before they are generated it stays inconclusive.
+        let coverability = if net.is_extended() { None } else { cached_coverability(&file_path, &net).ok() };
+        let graph = cached_reachability(&file_path, &net).ok();
+        Ok(build_all_evidence(&net, &structural, &invariants, graph.as_deref(), coverability.as_deref()))
     })
     .await
     .map_err(|error| format!("Falha na tarefa de evidências: {error}"))?
@@ -3117,16 +3080,7 @@ fn check_ctl_formula_impl(
 
     // 2. CTL is defined over the exact reachable markings. A coverability
     // abstraction must not be silently substituted for this graph.
-    let reach_engine = ReachabilityEngineImpl {
-        config: ReachabilityConfig {
-            max_nodes: config.max_nodes,
-            max_edges: config.max_edges,
-            ..ReachabilityConfig::default()
-        },
-    };
-    let graph = reach_engine
-        .build_complete(&net, &ctx)
-        .map_err(|e| format!("Exact reachability graph required for CTL: {}", e))?;
+    let graph = cached_reachability(&file_path, &net)?;
 
     // 3. Evaluate the CTL formula
     let ctl_engine = CTLEngineImpl {
@@ -3142,7 +3096,19 @@ fn check_ctl_formula_impl(
 
     let elapsed_ms = start.elapsed().as_millis() as f64;
 
+    let mut satisfying: Vec<usize> = result.satisfying_states.iter().map(|node| node.0 as usize).collect();
+    satisfying.sort_unstable();
+    let states_truncated = satisfying.len() > CTL_LISTED_STATES;
+    let states = satisfying
+        .iter()
+        .take(CTL_LISTED_STATES)
+        .map(|&id| CTLStateEntry { id, marking: marking_to_dto_vec(&graph.nodes[id].marking) })
+        .collect();
+
     Ok(CTLCheckResult {
+        states,
+        states_truncated,
+        place_names: net.places().iter().map(|p| p.name.clone()).collect(),
         satisfied: result.satisfied,
         count: result.satisfying_states.len(),
         total_states: result.total_states,
@@ -3618,6 +3584,7 @@ async fn get_minimal_coverability_set(
             racon_reduction::catalog::Objective::Coverability,
             GraphAlgorithm::CoverabilityMincov,
             false,
+            false,
         )?;
         let ctx = analysis_context_for_graph(config);
         let started = Instant::now();
@@ -3650,6 +3617,23 @@ async fn get_minimal_coverability_set(
     })
     .await
     .map_err(|error| format!("Falha na tarefa MinCov: {error}"))?
+}
+
+/// Symbolic state spaces (MDD/BDD), unfolding, structural/polyhedral reductions
+/// and CovProc/MP coverability sets; same entry point as the HTTP API route
+/// `POST /v1/sessions/{id}/algorithms/{algorithm}`.
+#[tauri::command]
+async fn run_advanced_analysis(
+    file_path: String,
+    algorithm: String,
+    params: Option<racon_engine::AdvancedParams>,
+) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let net = parse_pnt_file(&file_path)?;
+        racon_engine::run_advanced(&net, &algorithm, &params.unwrap_or_default()).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|error| format!("Falha na tarefa de análise avançada: {error}"))?
 }
 
 #[tauri::command]
@@ -3706,13 +3690,90 @@ mod tests {
 }
 
 // =============================================================================
+// System tray
+// =============================================================================
+
+struct TrayState {
+    show: tauri::menu::MenuItem<tauri::Wry>,
+    quit: tauri::menu::MenuItem<tauri::Wry>,
+}
+
+fn show_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+    let show = MenuItem::with_id(app, "tray-show", "Show SPECTRA", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "tray-quit", "Quit", true, None::<&str>)?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let menu = Menu::with_items(app, &[&show, &separator, &quit])?;
+
+    let mut builder = TrayIconBuilder::with_id("main")
+        .tooltip("SPECTRA")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "tray-show" => show_main_window(app),
+            "tray-quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+    builder.build(app)?;
+    app.manage(TrayState { show, quit });
+    Ok(())
+}
+
+/// Lets the frontend translate the tray menu and tooltip to the UI language.
+#[tauri::command]
+fn set_tray_labels(
+    app: AppHandle,
+    state: tauri::State<'_, TrayState>,
+    tooltip: String,
+    show: String,
+    quit: String,
+) -> Result<(), String> {
+    state.show.set_text(show).map_err(|e| e.to_string())?;
+    state.quit.set_text(quit).map_err(|e| e.to_string())?;
+    if let Some(tray) = app.tray_by_id("main") {
+        tray.set_tooltip(Some(tooltip)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+// =============================================================================
 // Main
 // =============================================================================
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
+            if let Ok(dir) = app.path().app_cache_dir() {
+                graph_cache::init(dir.join("graphs"));
+            }
+            if let Err(error) = setup_tray(app) {
+                eprintln!("could not create the system tray icon: {error}");
+            }
             let app_handle = app.handle().clone();
             let panic_app = app_handle.clone();
             let default_panic_hook = std::panic::take_hook();
@@ -3736,6 +3797,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            set_tray_labels,
             write_log_entry,
             read_log_entries,
             analyze_pnt,
@@ -3749,7 +3811,9 @@ fn main() {
             get_algorithm_catalog,
             validate_analysis_config,
             get_minimal_coverability_set,
+            run_advanced_analysis,
             get_analysis_evidence,
+            get_graph_cache_status,
             check_bad_states,
             check_place_boundedness,
             check_transition_dead,
@@ -3781,17 +3845,50 @@ mod ina_parity_tests {
 
     const MERCURY: &str = include_str!("../../crates/racon-engine/tests/fixtures/water_pumps.mercury");
 
+    /// What the user does in the Graphs tab: generate (and so save) the graphs of the net.
+    /// A graph that cannot be completed (unbounded net) is simply not saved.
+    fn generate_graphs(path: &str) {
+        graph_cache::init(std::env::temp_dir().join(format!("racon_graph_cache_tests_{}", std::process::id())));
+        let config = GraphGenerationConfig { max_nodes: 50_000, ..GraphGenerationConfig::default() };
+        let _ = get_reachability_graph_impl(path.to_string(), config);
+        let _ = get_coverage_tree_impl(path.to_string(), config);
+    }
+
     fn water_pump_file(tag: &str) -> String {
         let parser = MercuryParserImpl::new(MercuryParserConfig::default());
         let net = parser.parse_string(MERCURY).unwrap();
         let path = std::env::temp_dir().join(format!("racon_ina_parity_{tag}_{}.pnt", std::process::id()));
         std::fs::write(&path, petri_net_to_pnt_string(&net)).unwrap();
-        path.to_string_lossy().into_owned()
+        let path = path.to_string_lossy().into_owned();
+        generate_graphs(&path);
+        path
     }
 
     /// IR(3) IR_BUFFER MP1_RUNNING(1) MP1_STOPED MP2_RUNNING(1) MP2_STOPED OR(1) OR_BUFFER(2)
     /// SS_AVAILABLE(1) SS_UNAVAILABLE WATER_INPUT(1) WATER_OUTPUT(1)
     const M0: [i32; 12] = [3, 0, 1, 0, 1, 0, 1, 2, 1, 0, 1, 1];
+
+    #[test]
+    fn behavioural_properties_are_complete_once_the_graph_is_generated() {
+        let path = water_pump_file("behaviour");
+        assert!(graph_cache::status(&path).reachability);
+        let result = compute_behavioral_properties_impl(path, GraphGenerationConfig::default()).unwrap();
+        // Lp, PER, GFC and DCF are all decided from the saved graph.
+        assert_eq!(result.state_count, 111);
+        let _ = (result.place_live, result.persistent, result.gfc, result.dynamic_conflict_free);
+        assert!(!result.place_liveness.is_empty());
+    }
+
+    #[test]
+    fn queries_refuse_to_run_before_the_graph_is_generated() {
+        let path = std::env::temp_dir().join(format!("racon_no_graph_{}.pnt", std::process::id()));
+        std::fs::write(&path, INA_PNT).unwrap();
+        let path = path.to_string_lossy().into_owned();
+        graph_cache::init(std::env::temp_dir().join(format!("racon_graph_cache_empty_{}", std::process::id())));
+        let Err(error) = compute_distances_impl(path.clone(), None, None, GraphGenerationConfig::default()) else { panic!("ran without a graph") };
+        assert!(error.starts_with("GRAFO_NAO_GERADO"), "{error}");
+        assert!(!graph_cache::status(&path).reachability);
+    }
 
     #[test]
     fn marking_that_breaks_a_complement_invariant_is_refuted_algebraically() {
@@ -3818,7 +3915,9 @@ mod ina_parity_tests {
         let net = builder.build(tokens).unwrap();
         let path = std::env::temp_dir().join(format!("racon_cover_{tag}_{}.pnt", std::process::id()));
         std::fs::write(&path, petri_net_to_pnt_string(&net)).unwrap();
-        path.to_string_lossy().into_owned()
+        let path = path.to_string_lossy().into_owned();
+        generate_graphs(&path);
+        path
     }
 
     #[test]
@@ -4019,7 +4118,9 @@ mod ina_parity_tests {
     fn ina_pump_file(tag: &str) -> String {
         let path = std::env::temp_dir().join(format!("racon_ina_pdc_{tag}_{}.pnt", std::process::id()));
         std::fs::write(&path, INA_PNT).unwrap();
-        path.to_string_lossy().into_owned()
+        let path = path.to_string_lossy().into_owned();
+        generate_graphs(&path);
+        path
     }
 
     #[test]

@@ -1,0 +1,205 @@
+{
+  "open": "Referências e métodos",
+  "title": "Referências e métodos",
+  "lead": "Todo cálculo que o SPECTRA faz, com sua definição, como é computado, o que o resultado garante e onde deixa de valer. Cada item indica o crate Rust que o sustenta, de modo que um resultado pode ser rastreado até o código e até uma fonte.",
+  "back": "Voltar à análise",
+  "search": "Filtrar métodos",
+  "searchPlaceholder": "Filtre por nome, fórmula ou crate",
+  "noMatch": "Nenhum método corresponde a “{query}”.",
+  "contents": "Conteúdo",
+  "what": "O que responde",
+  "how": "Como é calculado",
+  "limits": "Garantias e limites",
+  "formulas": "Fórmulas",
+  "implementation": "Implementação",
+  "sources": "Fontes",
+  "noSource": "Sem fonte externa: definição elementar aplicada diretamente.",
+  "live.title": "Catálogo de algoritmos",
+  "live.intro": "Lido do motor em execução, então sempre corresponde à versão instalada. Versão: {version}.",
+  "live.loading": "Carregando catálogo…",
+  "live.error": "Catálogo indisponível: {error}",
+  "live.status": "Situação",
+  "live.role": "Papel",
+  "live.role.exploration": "Exploração",
+  "live.role.reduction": "Redução",
+  "live.objectives": "Objetivos",
+  "live.netClasses": "Classes de rede",
+  "live.version": "Versão implementada",
+  "live.notImplemented": "não implementado",
+  "live.proof": "Mapeamento de prova ou teste",
+  "live.none": "nenhum registrado",
+  "live.preserves": "Preserva",
+  "live.doesNotPreserve": "Não preserva",
+  "live.when": "Quando usar",
+  "live.whenNot": "Quando não usar",
+  "live.output": "Produz",
+  "bib.title": "Bibliografia",
+  "bib.intro": "Fontes citadas acima. A nota de acesso diz o quanto de cada fonte foi de fato consultado.",
+  "bib.access": "Acesso",
+  "bib.classic": "Referências clássicas",
+  "sections": {
+    "model": {
+      "title": "Modelo e regra de disparo",
+      "intro": "As definições sobre as quais todo outro cálculo se apoia.",
+      "items": {
+        "firing": {
+          "name": "Regra de disparo",
+          "what": "Se uma transição pode disparar em uma marcação e qual marcação resulta.",
+          "how": "Uma transição está habilitada quando cada lugar de entrada tem ao menos o peso do arco. Disparar remove os pesos de entrada e soma os de saída. Arcos ausentes têm peso 0.",
+          "limits": "Aritmética inteira exata. Redes com arcos inibidores ou transições imediatas usam a regra estendida, e vários algoritmos abaixo ficam bloqueados para elas."
+        },
+        "state-equation": {
+          "name": "Matriz de incidência e equação de estado",
+          "what": "O efeito líquido de sequências de disparo sobre as marcações, sem simulá-las.",
+          "how": "C é Post menos Pre. Toda sequência de disparo com vetor de Parikh x leva de m₀ a m₀ + C·x.",
+          "limits": "Condição necessária para alcançabilidade, não suficiente: uma solução da equação não prova que a marcação é alcançável."
+        }
+      }
+    },
+    "structural": {
+      "title": "Análise estrutural",
+      "intro": "Propriedades lidas só dos arcos, sem espaço de estados.",
+      "items": {
+        "classes": {
+          "name": "Classes de rede e topologia",
+          "what": "Se a rede é ordinária, pura, máquina de estados, grafo marcado, free-choice, free-choice estendida e semelhantes.",
+          "how": "Cada classe é uma verificação sobre pré-conjuntos e pós-conjuntos de lugares e transições, feita direto nas listas de arcos.",
+          "limits": "Puramente estrutural e exato. Estar fora de uma classe não diz nada sobre o comportamento."
+        },
+        "siphons-traps": {
+          "name": "Sifões e armadilhas",
+          "what": "Conjuntos de lugares que não recuperam fichas depois de vazios (sifões) ou nunca perdem todas as fichas depois de marcados (armadilhas).",
+          "how": "Verificados contra o pré e o pós-conjunto de cada transição, como nas fórmulas.",
+          "limits": "Usados como evidência estrutural para condições de deadlock e vivacidade, junto com as regras das propriedades comportamentais."
+        }
+      }
+    },
+    "invariants": {
+      "title": "Invariantes",
+      "intro": "Leis de conservação lineares e comportamentos repetitivos obtidos por álgebra linear.",
+      "items": {
+        "p-invariants": {
+          "name": "P-invariantes",
+          "what": "Contagens ponderadas de fichas que nunca mudam.",
+          "how": "Resolve yᵀC = 0 nos inteiros com aritmética de precisão arbitrária e informa os vetores de suporte mínimo. Cada vetor do núcleo é verificado antes de ser informado.",
+          "limits": "Exato, sem ponto flutuante. Matrizes muito grandes são recusadas com erro em vez de uma resposta aproximada."
+        },
+        "t-invariants": {
+          "name": "T-invariantes",
+          "what": "Contagens de disparo que devolvem a rede à mesma marcação.",
+          "how": "Resolve Cx = 0 com x ≥ 0 usando o mesmo motor exato dos P-invariantes.",
+          "limits": "Um T-invariante é algébrico. Não prova que a sequência consegue disparar a partir de m₀."
+        },
+        "coverage": {
+          "name": "Cobertura e propriedades derivadas",
+          "what": "Se invariantes positivos cobrem todos os lugares ou transições, e o que decorre disso.",
+          "how": "CPI, CTI, conservatividade e limitação estrutural são derivados do conjunto de invariantes. A limitação estrutural usa o lema de Farkas, como em Murata.",
+          "limits": "Cobrir todos os lugares por P-invariantes não negativos prova limitação. A volta não é afirmada."
+        }
+      }
+    },
+    "statespace": {
+      "title": "Espaço de estados",
+      "intro": "Os grafos que o SPECTRA constrói a partir da marcação inicial.",
+      "items": {
+        "reachability": {
+          "name": "Grafo de alcançabilidade",
+          "what": "Toda marcação alcançável a partir de m₀ e qual transição as liga.",
+          "how": "Exploração em largura ou em profundidade a partir de m₀, criando um nó para cada marcação nova. A busca em largura segue Cormen et al. §20.2: fila FIFO, cada marcação descoberta uma vez e profundidade do nó igual ao menor número de disparos desde m₀ (Teorema 20.5). A busca em profundidade segue o DFS-VISIT da §20.3 com pilha explícita: um nó é descoberto no primeiro acesso e concluído quando suas transições habilitadas se esgotam. Ambas custam O(V + E) sobre o grafo que geram.",
+          "limits": "Exato só quando termina. Limites de estados, arestas e memória o interrompem, e um grafo interrompido é informado como truncado, nunca como veredito. Precisa de rede limitada para terminar."
+        },
+        "coverability": {
+          "name": "Árvore de cobertura (Karp–Miller, Finkel)",
+          "what": "Limitação e quais lugares podem crescer sem limite, mesmo quando a rede é ilimitada.",
+          "how": "Explora como o grafo de alcançabilidade, mas quando uma marcação domina estritamente um ancestral, os lugares que crescem viram ω, que representa fichas em quantidade arbitrária.",
+          "limits": "Sempre termina em redes lugar/transição. Superaproxima a alcançabilidade, então não prova alcançabilidade exata. Exige monotonicidade, por isso redes com arcos inibidores ou transições imediatas são recusadas."
+        },
+        "mincov": {
+          "name": "MinCov (conjunto mínimo de cobertura)",
+          "what": "O menor conjunto de marcações ω que cobre toda marcação alcançável.",
+          "how": "Algoritmo 1 de Finkel–Haddad–Khmelnitsky 2020, com cada passo mapeado para a função Rust que o implementa, no código do algoritmo.",
+          "limits": "Marcado como experimental. Conferido contra Karp–Miller em redes aleatórias, o que é evidência e não prova."
+        }
+      }
+    },
+    "behavioural": {
+      "title": "Propriedades comportamentais",
+      "intro": "Propriedades das execuções do sistema, derivadas do espaço de estados.",
+      "items": {
+        "boundedness": {
+          "name": "Limitação",
+          "what": "Se algum lugar pode acumular fichas sem limite, e o limite por lugar.",
+          "how": "Ilimitada se um ω aparece na árvore de cobertura. Em redes limitadas, o limite é o máximo sobre o grafo de alcançabilidade.",
+          "limits": "Decidida pela árvore de cobertura, então vale mesmo quando o grafo de alcançabilidade não pode ser construído."
+        },
+        "deadlock-liveness": {
+          "name": "Deadlocks, transições mortas e vivacidade",
+          "what": "Marcações alcançáveis sem transição habilitada, transições que nunca disparam e transições que sempre podem disparar de novo.",
+          "how": "Deadlocks e transições mortas vêm do grafo de alcançabilidade. A vivacidade usa componentes fortemente conexos encontrados com o algoritmo de Tarjan.",
+          "limits": "Exige o grafo de alcançabilidade completo e sem redução. Se o grafo foi truncado ou reduzido, o resultado é informado como inconclusivo."
+        },
+        "reversibility": {
+          "name": "Reversibilidade e estados home",
+          "what": "Se a rede sempre pode voltar à marcação inicial.",
+          "how": "A marcação inicial é estado home exatamente quando toda marcação alcançável chega a ela, o que num grafo finito significa que o grafo é um único componente fortemente conexo.",
+          "limits": "Mesma condição da vivacidade: exige o grafo completo."
+        }
+      }
+    },
+    "verification": {
+      "title": "Verificação e evidências",
+      "intro": "Responder uma pergunta sobre a rede e mostrar por que a resposta vale.",
+      "items": {
+        "ctl": {
+          "name": "Verificação CTL",
+          "what": "Se uma fórmula temporal vale na marcação inicial, com testemunho ou contraexemplo.",
+          "how": "As fórmulas são escritas na DSL em português, analisadas e avaliadas sobre o grafo de alcançabilidade. EF, EU e AF usam pontos fixos mínimos. EG usa ponto fixo máximo sobre componentes fortemente conexos.",
+          "limits": "Avaliada no grafo finito, então exige grafo completo e sem redução. Grafos de stubborn sets não são entrada válida para CTL."
+        },
+        "marking-test": {
+          "name": "Teste de marcação (inalcançabilidade)",
+          "what": "Uma prova de que uma marcação não pode ser alcançada, sem explorar o espaço de estados.",
+          "how": "Tenta resolver C·x = m* − m₀ nos naturais. Sem solução, devolve um vetor de Farkas verificado de forma exata.",
+          "limits": "Pode provar inalcançabilidade. Quando a equação tem solução, a resposta é inconclusiva, não “alcançável”."
+        },
+        "bad-states": {
+          "name": "Estados ruins",
+          "what": "Se a rede pode alcançar uma marcação que viola uma condição de segurança definida por você.",
+          "how": "Busca no espaço de estados uma marcação que satisfaz a fórmula e devolve a menor sequência de disparos como testemunho.",
+          "limits": "Uma resposta negativa só é prova quando a busca cobriu todo o espaço de estados. Caso contrário é informada como inconclusiva."
+        },
+        "evidence": {
+          "name": "Registros de evidência",
+          "what": "Para cada propriedade informada: sua definição, o método, a situação e o certificado.",
+          "how": "Cada resultado é marcado como prova, contraprova, certificado algébrico ou inconclusivo, com a definição matemática e a referência do método anexadas.",
+          "limits": "A evidência diz o que foi mostrado e por qual método. Não fortalece um resultado além do que o método garante."
+        }
+      }
+    },
+    "reductions": {
+      "title": "Reduções",
+      "intro": "Formas de explorar menos estados. Cada uma preserva apenas algumas propriedades.",
+      "items": {
+        "stubborn": {
+          "name": "Stubborn sets",
+          "what": "Alcançabilidade de deadlock com muito menos estados.",
+          "how": "Em cada marcação, só as transições habilitadas de um conjunto stubborn são exploradas. O conjunto é fechado sob conflito e sob os habilitadores de seus membros desabilitados.",
+          "limits": "Preserva alcançabilidade de deadlock. Não há proviso de ignorar implementado, então não leia vivacidade, transições mortas, reversibilidade nem CTL de um grafo assim."
+        },
+        "symmetry": {
+          "name": "Redução por simetria",
+          "what": "Se uma marcação é alcançável, se existe deadlock e se a rede é limitada, num grafo com uma marcação por classe de marcações equivalentes.",
+          "how": "O grupo de automorfismos da rede (Def. 3.2) é buscado por individualização e refinamento, e cada gerador é conferido contra a rede. Cada marcação sucessora é trocada pela menor marcação da sua órbita, obtida por backtracking na representação de Schreier–Sims (Alg. 4.2), de modo que marcações equivalentes compartilham um nó.",
+          "limits": "Preserva a existência de deadlock e a limitação da rede (Cor. 2.12), a alcançabilidade a menos de equivalência quando o grupo fixa a marcação inicial (Cor. 2.13, o padrão) e CTL* só com proposições invariantes por simetria. Não preserva o limite de um lugar, uma transição morta específica, contagens de estados nem caminhos mínimos. Se a busca por geradores atinge o limite, usa-se um subgrupo: continua correto, mas pode ficar maior. Só para redes lugar/transição simples e sem combinar com stubborn sets."
+        },
+        "structural-rules": {
+          "name": "Reduções estruturais (regras A–I)",
+          "what": "Se uma marcação que satisfaz uma fórmula é alcançável, numa rede menor reescrita para essa fórmula.",
+          "how": "As regras A–I de Bønneland et al. (2019) reescrevem a rede ponderada, inclusive com arcos inibidores, conforme os lugares que a fórmula menciona. A busca roda na rede reduzida.",
+          "limits": "A rede reduzida responde só à fórmula para a qual foi construída e não deve ser usada para desenhar o grafo. As regras G e I não preservam alcançabilidade de deadlock e ficam desligadas em consultas de deadlock. Redes com transições imediatas são rejeitadas. A regra C verifica sua condição em toda transição, mais estrito que o artigo."
+        }
+      }
+    }
+  },
+  "live.notes": "Observações"
+}

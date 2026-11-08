@@ -1,0 +1,76 @@
+{
+  "selectFile": "Select a file to use the advanced methods.",
+  "hint": "Methods with their own result: symbolic state spaces, unfolding and reductions. Coverability sets (GRVB and Monotone-Pruning) are in the Graphs tab. They are experimental and each one states what it does not preserve.",
+  "method": "Method",
+  "limit": "Node/event limit",
+  "limitDefault": "default",
+  "order": "Adequate order",
+  "goal": "Goal",
+  "goalDeadlock": "Deadlock",
+  "goalSafety": "Safety (support)",
+  "support": "Support places",
+  "run": "Run",
+  "running": "Running…",
+  "elapsed": "Time: {ms} ms",
+  "doesNotPreserve": "Does not preserve",
+  "methods": {
+    "symbolic_mdd": {
+      "name": "MDD + Saturation",
+      "when": "Bounded P/T nets with several tokens per place: exact state count and place bounds without enumerating states. No transition graph, no CTL."
+    },
+    "symbolic_bdd": {
+      "name": "BDD (Bryant 1986)",
+      "when": "1-safe nets only (weights 1, at most one token per place); the net is refused if a firing violates it."
+    },
+    "unfolding_prefix": {
+      "name": "Unfolding prefix (ERV)",
+      "when": "1-bounded concurrent nets: reachable markings, dead transitions and deadlock."
+    },
+    "structural_rules": {
+      "name": "Structural reductions (Thierry-Mieg)",
+      "when": "The reduced net is a different net: it only preserves deadlock or safety over the chosen support."
+    },
+    "polyhedral_abstraction": {
+      "name": "Polyhedral abstraction",
+      "when": "Reduces the net to (N, E, N′) with linear equations between places. SMT checking is not included."
+    }
+  },
+  "fields": {
+    "state_count": "Reachable states",
+    "diagram_nodes": "Diagram nodes",
+    "allocated_nodes": "Allocated nodes",
+    "place_bounds": "Place bounds",
+    "place_names": "Places",
+    "states": "Listed markings",
+    "states_listed": "Complete list",
+    "encoding": "Encoding",
+    "iterations": "Iterations",
+    "events": "Events",
+    "conditions": "Conditions",
+    "cutoff_events": "Cut-off events",
+    "dead_transitions": "Dead transitions",
+    "reachable_markings": "Reachable markings",
+    "has_deadlock": "Has deadlock",
+    "deadlock_marking": "Deadlock marking",
+    "order": "Adequate order",
+    "goal": "Goal",
+    "original_places": "Original places",
+    "original_transitions": "Original transitions",
+    "remaining_places": "Remaining places",
+    "remaining_transitions": "Remaining transitions",
+    "initial_marking": "Reduced initial marking",
+    "empty_net": "Empty net",
+    "deadlock_free": "Deadlock-free",
+    "total_applications": "Rule applications",
+    "applications_per_rule": "Applications per rule",
+    "agglomerations": "Agglomerations",
+    "rounds": "Rounds",
+    "equations": "Equations E",
+    "bounded": "Bounded",
+    "unbounded_places": "Unbounded places",
+    "elements": "Maximal elements",
+    "tree_vertices": "Tree vertices",
+    "accelerations": "Accelerations"
+  },
+  "extendedBlocked": "This net has inhibitor arcs or immediate transitions, and these methods only accept plain place/transition nets. Remove those elements to run them."
+}

@@ -23,6 +23,15 @@ pub enum DslExpr {
     /// `enabled(t1, t2)`: at least one of the transitions has its input places marked
     /// (and its inhibitor places below their thresholds).
     Enabled(Vec<String>),
+    /// Linear atom `Σ cᵢ·pᵢ ⋈ k`, already normalised to places on the left and a constant on
+    /// the right (`P1 + P2 >= 2`, `P1 <= P2`, `2*P1 - P2 = 0`). Names are resolved by the translator.
+    Linear {
+        terms: Vec<(String, i64)>,
+        op: DslCompOp,
+        constant: i64,
+    },
+    /// No transition of the net is enabled (the paper's `deadlock` atom).
+    Deadlock,
     Not(Box<DslExpr>),
     And(Box<DslExpr>, Box<DslExpr>),
     Or(Box<DslExpr>, Box<DslExpr>),
@@ -105,6 +114,14 @@ pub enum Token {
 
     // `enabled(t1, t2)` predicate over transitions
     Enabled,
+
+    // `deadlock` atom: no transition is enabled
+    Deadlock,
+
+    // Arithmetic
+    Plus,
+    Minus,
+    Star,
 
     // Comparisons
     Eq,
@@ -231,6 +248,7 @@ impl Tokenizer {
     fn match_keyword(word: &str) -> Option<Token> {
         match word.to_lowercase().as_str() {
             "enabled" | "habilitada" | "habilitado" => Some(Token::Enabled),
+            "deadlock" | "bloqueio" | "impasse" => Some(Token::Deadlock),
             "true" | "t" | "verdadeiro" => Some(Token::True),
             "false" | "falso" => Some(Token::False),
             "not" | "nao" | "não" | "never" | "!" => Some(Token::Not),
@@ -260,7 +278,7 @@ impl Tokenizer {
             "at-most" | "no-maximo" | "máximo" => Some(Token::AtMost),
             "between" | "entre" => Some(Token::Between),
             "path" | "paths" | "caminho" | "caminhos" => Some(Token::Path),
-            "all" | "todos" => Some(Token::All),
+            "all" | "todos" | "todo" | "toda" | "todas" => Some(Token::All),
             "steps" | "step" | "passo" => Some(Token::Steps),
             "in" | "no" | "na" | "em" => Some(Token::In),
             "the" | "o" | "os" | "as" => Some(Token::The),
@@ -349,15 +367,67 @@ impl Tokenizer {
                 }
                 Some('-') => {
                     self.advance();
-                    tokens.push((Token::Not, line, col));
+                    tokens.push((Token::Minus, line, col));
+                }
+                Some('+') => {
+                    self.advance();
+                    tokens.push((Token::Plus, line, col));
+                }
+                Some('*') => {
+                    self.advance();
+                    tokens.push((Token::Star, line, col));
                 }
                 Some(c) if c.is_ascii_digit() => {
                     let n = self.read_number();
                     tokens.push((Token::Number(n), line, col));
                 }
+                // Quoted name: always a place/transition, never a keyword ("B", `x`, "In").
+                Some(q) if q == '"' || q == '`' => {
+                    self.advance();
+                    let mut name = String::new();
+                    loop {
+                        match self.advance() {
+                            Some(c) if c == q => break,
+                            Some(c) => name.push(c),
+                            None => {
+                                return Err(DslParseError::SyntaxError {
+                                    line,
+                                    col,
+                                    message: "Unterminated quoted name".to_string(),
+                                })
+                            }
+                        }
+                    }
+                    if name.is_empty() {
+                        return Err(DslParseError::SyntaxError {
+                            line,
+                            col,
+                            message: "Empty quoted name".to_string(),
+                        });
+                    }
+                    tokens.push((Token::Place(name), line, col));
+                }
                 Some(c) if c.is_alphabetic() || c == '_' => {
                     let word = self.read_word();
-                    if let Some(keyword) = Self::match_keyword(&word) {
+                    // A reserved word directly followed by a comparison operator
+                    // ("B = 1", "x >= 2") can only be a place name.
+                    let before_comparison = {
+                        let mut i = self.pos;
+                        while self.input.get(i).is_some_and(|c| c.is_whitespace()) {
+                            i += 1;
+                        }
+                        matches!(self.input.get(i), Some('=' | '<' | '>'))
+                            || (self.input.get(i) == Some(&'!')
+                                && self.input.get(i + 1) == Some(&'='))
+                    };
+                    if before_comparison
+                        && !matches!(
+                            Self::match_keyword(&word),
+                            None | Some(Token::Is | Token::Equals)
+                        )
+                    {
+                        tokens.push((Token::Place(word), line, col));
+                    } else if let Some(keyword) = Self::match_keyword(&word) {
                         tokens.push((keyword, line, col));
                     } else {
                         tokens.push((Token::Place(word), line, col));
@@ -506,7 +576,8 @@ impl Parser {
     fn parse_not_expr(&mut self) -> Result<DslExpr, DslParseError> {
         self.skip_stop_words();
         match self.peek().0 {
-            Token::Not => {
+            // A leading "-" is the legacy spelling of "not"; inside arithmetic it is subtraction.
+            Token::Not | Token::Minus => {
                 self.advance();
                 let inner = self.parse_not_expr()?;
                 Ok(DslExpr::Not(Box::new(inner)))
@@ -522,8 +593,10 @@ impl Parser {
         // Check for quantifier prefix: "existe um caminho" / "para todos os caminhos"
         let quantifier = self.try_parse_quantifier();
 
-        // Prefix form: "existe caminho até φ e ψ" / "para todo caminho até φ e ψ".
-        // This is the Portuguese spelling exposed by the frontend for E[φ U ψ].
+        // Older prefix form, still accepted so saved queries keep working:
+        // "existe caminho até φ e ψ" / "para todo caminho até φ e ψ". Here "e" is only the
+        // separator of the two sides, not a conjunction. The documented form is the infix one,
+        // "existe caminho (φ) até (ψ)", handled by `parse_until_or_atom_with_q`.
         if quantifier.is_some() && matches!(self.peek().0, Token::Until) {
             self.advance();
             let left = self.parse_not_expr()?;
@@ -650,6 +723,11 @@ impl Parser {
                 self.advance();
                 self.parse_enabled()
             }
+            (Token::Deadlock, _, _) => {
+                self.advance();
+                Ok(DslExpr::Deadlock)
+            }
+            (Token::Number(_), _, _) => self.parse_linear_comparison(),
             (Token::Place(name), line, col) => {
                 self.advance();
                 self.parse_place_expr(name, line, col)
@@ -695,6 +773,10 @@ impl Parser {
         _line: usize,
         _col: usize,
     ) -> Result<DslExpr, DslParseError> {
+        if self.starts_linear_atom() {
+            self.pos -= 1; // back to the place token
+            return self.parse_linear_comparison();
+        }
         self.skip_stop_words();
 
         // Check for interval: "P1 between 1 and 5"
@@ -773,6 +855,133 @@ impl Parser {
             op,
             value,
         })
+    }
+
+    fn is_comparison(tok: &Token) -> bool {
+        matches!(
+            tok,
+            Token::Eq
+                | Token::Is
+                | Token::Equals
+                | Token::Lt
+                | Token::Gt
+                | Token::Le
+                | Token::Ge
+                | Token::Neq
+                | Token::GreaterThan
+                | Token::LessThan
+                | Token::GreaterOrEqual
+                | Token::LessOrEqual
+                | Token::AtLeast
+                | Token::AtMost
+        )
+    }
+
+    fn token_at(&self, offset: usize) -> &Token {
+        &self.tokens.get(self.pos + offset).unwrap_or_else(|| self.tokens.last().unwrap()).0
+    }
+
+    /// After a place name: does an arithmetic atom follow (`P1 + P2 ...`, `P1 <= P2`, `P1 = 1 + P2`)?
+    fn starts_linear_atom(&self) -> bool {
+        let arith = |t: &Token| matches!(t, Token::Plus | Token::Minus | Token::Star);
+        if arith(self.token_at(0)) {
+            return true;
+        }
+        if Self::is_comparison(self.token_at(0)) {
+            return match self.token_at(1) {
+                Token::Place(_) => true,
+                Token::Number(_) => arith(self.token_at(2)),
+                _ => false,
+            };
+        }
+        false
+    }
+
+    fn syntax_error<T>(&self, message: &str) -> Result<T, DslParseError> {
+        let (_, line, col) = self.peek();
+        Err(DslParseError::SyntaxError { line: *line, col: *col, message: message.to_string() })
+    }
+
+    /// `sum := ['-'] term (('+' | '-') term)*` ; `term := factor ('*' factor)*` with at most one
+    /// place per term (the formula must stay linear).
+    fn parse_linear_sum(&mut self) -> Result<(Vec<(String, i64)>, i64), DslParseError> {
+        let mut places: Vec<(String, i64)> = Vec::new();
+        let mut constant: i64 = 0;
+        let mut sign: i64 = 1;
+        if matches!(self.peek().0, Token::Minus) {
+            self.advance();
+            sign = -1;
+        }
+        loop {
+            self.skip_stop_words();
+            let mut coeff: i64 = sign;
+            let mut place: Option<String> = None;
+            loop {
+                match self.advance().0.clone() {
+                    Token::Number(n) => {
+                        let n = i64::try_from(n)
+                            .or_else(|_| self.syntax_error("Number too large"))?;
+                        coeff = coeff
+                            .checked_mul(n)
+                            .map_or_else(|| self.syntax_error("Arithmetic overflow"), Ok)?;
+                    }
+                    Token::Place(name) => {
+                        if place.is_some() {
+                            return self.syntax_error(
+                                "Non-linear term: multiply a place only by constants",
+                            );
+                        }
+                        place = Some(name);
+                    }
+                    _ => {
+                        self.pos -= 1;
+                        return self.syntax_error("Expected a number or a place in the expression");
+                    }
+                }
+                if matches!(self.peek().0, Token::Star) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+            match place {
+                Some(name) => places.push((name, coeff)),
+                None => {
+                    constant = constant
+                        .checked_add(coeff)
+                        .map_or_else(|| self.syntax_error("Arithmetic overflow"), Ok)?;
+                }
+            }
+            match self.peek().0 {
+                Token::Plus => {
+                    self.advance();
+                    sign = 1;
+                }
+                Token::Minus => {
+                    self.advance();
+                    sign = -1;
+                }
+                _ => break,
+            }
+        }
+        Ok((places, constant))
+    }
+
+    /// `sum ⋈ sum`, normalised to `Σ cᵢ·pᵢ ⋈ k` (right-hand places move to the left).
+    fn parse_linear_comparison(&mut self) -> Result<DslExpr, DslParseError> {
+        let (mut terms, left_const) = self.parse_linear_sum()?;
+        self.skip_stop_words();
+        if !Self::is_comparison(&self.peek().0) {
+            return self.syntax_error("Expected a comparison operator");
+        }
+        let op_token = self.advance().0.clone();
+        let op = self.map_comparison_token(&op_token)?;
+        let (right_terms, right_const) = self.parse_linear_sum()?;
+        terms.extend(right_terms.into_iter().map(|(name, c)| (name, -c)));
+        let constant = right_const
+            .checked_sub(left_const)
+            .map_or_else(|| self.syntax_error("Arithmetic overflow"), Ok)?;
+        Ok(DslExpr::Linear { terms, op, constant })
     }
 
     fn map_comparison_token(&self, tok: &Token) -> Result<DslCompOp, DslParseError> {

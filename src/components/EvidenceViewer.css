@@ -86,26 +86,39 @@
 
 .evidence-formula { display: block; overflow-x: auto; padding: var(--space-3) var(--space-4); color: var(--text-main); background: var(--bg-elevated); border-left: 3px solid var(--accent-secondary); border-radius: var(--radius-sm); font-family: Georgia, 'Times New Roman', serif; font-size: 1.125rem; }
 
-.proof-certificate { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
-.proof-assumptions, .proof-table-wrap, .proof-conclusion { grid-column: 1 / -1; }
-.proof-assumptions, .proof-facts, .proof-derivation { min-width: 0; padding: var(--space-4); border: 1px solid var(--border-light); border-radius: var(--radius-md); }
+/* The certificate reads top to bottom as one argument: assumptions, data, steps, coverage.
+ * A rail on the left ties the stages together. */
+.proof-certificate { display: flex; flex-direction: column; margin-left: var(--space-2); border-left: 2px solid var(--border); }
+.proof-stage { position: relative; min-width: 0; padding: 0 0 var(--space-5) var(--space-5); }
+.proof-stage::before { content: ''; position: absolute; left: -6px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--bg-surface); border: 2px solid var(--text-muted); }
+.proof-stage:last-child { padding-bottom: 0; }
+.ev-proven .proof-stage:last-child::before { border-color: var(--green); background: var(--green); }
+.ev-disproven .proof-stage:last-child::before { border-color: var(--red); background: var(--red); }
+.ev-inconclusive .proof-stage:last-child::before { border-color: var(--amber); background: var(--amber); }
 .proof-label { display: block; margin-bottom: var(--space-2); color: var(--text-main); font-size: 0.8125rem; font-weight: 600; }
+.proof-assumptions { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: var(--space-1); }
+.proof-facts { max-width: 720px; }
 .proof-fact { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(40px, auto) minmax(60px, auto); gap: var(--space-3); align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--border-light); }
 .proof-fact:last-child { border-bottom: 0; }
 .proof-fact strong { color: var(--text-main); font-family: var(--font-mono); font-size: 0.8125rem; text-align: right; overflow-wrap: anywhere; }
 .proof-fact .latex-formula, .proof-step .latex-formula { color: var(--accent-secondary); font-family: Georgia, 'Times New Roman', serif; }
 
-.proof-derivation { list-style: none; }
+.proof-derivation { list-style: none; margin: 0; padding: 0; }
 .proof-step { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: var(--space-2); padding: 6px 0; }
 .proof-step-n { width: 20px; height: 20px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 0.6875rem; border: 1px solid var(--border); border-radius: 50%; color: var(--text-secondary); margin-top: 2px; }
 .proof-step p { margin: 0 0 3px; }
+.proof-coverage p { color: var(--text-secondary); max-width: 72ch; }
 
-.proof-conclusion { padding: var(--space-4) var(--space-5); background: var(--bg-elevated); border-left: 4px solid var(--text-main); border-radius: var(--radius-sm); }
-.ev-proven .proof-conclusion { border-left-color: var(--green); }
-.ev-disproven .proof-conclusion { border-left-color: var(--red); }
-.ev-inconclusive .proof-conclusion { border-left-color: var(--amber); }
-.proof-conclusion strong { display: block; color: var(--text-main); font-family: Georgia, 'Times New Roman', serif; font-size: 1.125rem; font-weight: 600; line-height: 1.4; }
-.proof-conclusion p { margin-top: var(--space-1); color: var(--text-muted); font-size: 0.8125rem; }
+/* The guarantee: the claim the certificate backs, stated before the proof. */
+.ev-guarantee { grid-column: 1 / -1; max-width: 72ch; margin: 0; padding: var(--space-3) var(--space-4); background: var(--bg-elevated); border-left: 4px solid var(--text-muted); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: var(--text-main); font-size: 1rem; font-weight: 500; line-height: 1.5; }
+.ev-proven .ev-guarantee { border-left-color: var(--green); }
+.ev-disproven .ev-guarantee { border-left-color: var(--red); }
+.ev-inconclusive .ev-guarantee { border-left-color: var(--amber); }
+
+.ev-block-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.ev-copy { padding: 3px var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font-size: 0.8125rem; cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast); }
+.ev-copy:hover { background: var(--bg-elevated); color: var(--text-main); }
+.ev-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .proof-table-scroll { overflow-x: auto; border: 1px solid var(--border-light); border-radius: var(--radius-sm); }
 .proof-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 0.8125rem; }
@@ -130,9 +143,9 @@
 @media (max-width: 640px) {
   .ev-detail { padding: var(--space-4); }
   .ev-detail-head { grid-template-columns: minmax(0, 1fr); }
-  .proof-certificate { grid-template-columns: minmax(0, 1fr); }
-  .proof-facts, .proof-derivation { grid-column: 1 / -1; }
   .proof-fact { grid-template-columns: 1fr; gap: 2px; }
   .proof-fact strong { text-align: left; }
 }
 @media (prefers-reduced-motion: reduce) { .ev-pane { animation: none; } .ev-index *, .ev-filters * { transition: none !important; } }
+
+.ev-pending { max-width: 80ch; padding: var(--space-3) var(--space-4); border-left: 4px solid var(--amber); background: var(--amber-subtle); color: var(--text-main); font-size: 0.875rem; line-height: 1.5; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }

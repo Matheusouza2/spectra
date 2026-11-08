@@ -4,5 +4,7 @@
   "invariants": "P/T Invariants",
   "evidence": "Evidence",
   "tokens": "Token Game",
-  "verify": "Verification"
+  "verify": "Verification",
+  "advanced": "Alternative methods",
+  "needsGraph": "Generate the graph in the Graphs tab to unlock verification."
 }

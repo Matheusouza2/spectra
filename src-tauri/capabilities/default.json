@@ -1,9 +1,12 @@
 {
   "identifier": "default",
   "description": "Default capability set for Racon Desktop",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
-    "dialog:default"
+    "dialog:default",
+    "notification:default"
   ]
 }

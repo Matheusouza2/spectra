@@ -51,3 +51,34 @@ pub trait StateSpace: Send + Sync {
         true
     }
 }
+
+/// A shared graph is a graph: lets cached `Arc<Graph>` values be passed wherever a state space is expected.
+impl<T: StateSpace + ?Sized> StateSpace for std::sync::Arc<T> {
+    fn successors(&self, node: NodeId) -> &[NodeId] {
+        (**self).successors(node)
+    }
+    fn predecessors(&self, node: NodeId) -> &[NodeId] {
+        (**self).predecessors(node)
+    }
+    fn outgoing_edges(&self, node: NodeId) -> Vec<(NodeId, TransitionId)> {
+        (**self).outgoing_edges(node)
+    }
+    fn marking(&self, node: NodeId) -> &Marking {
+        (**self).marking(node)
+    }
+    fn node_count(&self) -> usize {
+        (**self).node_count()
+    }
+    fn edge_count(&self) -> usize {
+        (**self).edge_count()
+    }
+    fn initial_node(&self) -> NodeId {
+        (**self).initial_node()
+    }
+    fn is_finite(&self) -> bool {
+        (**self).is_finite()
+    }
+    fn is_exact(&self) -> bool {
+        (**self).is_exact()
+    }
+}

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { DEFAULT_LANGUAGE, LANGUAGES, messages } from '../locales';
 import { translateBackend } from './backend-messages';
+import { syncTrayLabels } from '../services/desktop-shell';
 
 const STORAGE_KEY = 'racon-language';
 const I18nContext = createContext(null);
@@ -41,6 +42,7 @@ export function I18nProvider({ children }) {
   useEffect(() => {
     document.documentElement.setAttribute('lang', language);
     try { localStorage.setItem(STORAGE_KEY, language); } catch { /* ignore */ }
+    syncTrayLabels(language);
   }, [language]);
 
   const setLanguage = useCallback((code) => {

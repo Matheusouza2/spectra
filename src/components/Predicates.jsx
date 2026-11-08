@@ -18,7 +18,7 @@ async function copyText(text) {
 
 /**
  * INA "define an enabledness predicate" (E) and "convert a set of states to a predicate" (C).
- * A predicate is a disjunction of conjunctions of place bounds, saved by INA as a .pdc file.
+ * A predicate is a disjunction of conjunctions of place bounds.
  */
 export default function Predicates({ filePath, blocked = false, onUseInCtl }) {
   const { t, tm, language } = useI18n();
@@ -69,7 +69,8 @@ export default function Predicates({ filePath, blocked = false, onUseInCtl }) {
   const useQuery = result ? reachabilityQuery(result.kind === 'enabled' ? result.dsl : result.dsl, dsl) : '';
 
   return (
-    <div className="pr">
+    <div className="pr vf-split">
+    <div className="vf-in">
       <section className="pr-card" aria-labelledby="pr-e">
         <h3 id="pr-e">{t('verify.predicates.enabled.title')}</h3>
         <p className="pr-desc">{t('verify.predicates.enabled.desc')}</p>
@@ -119,6 +120,8 @@ export default function Predicates({ filePath, blocked = false, onUseInCtl }) {
         {blocked && <p className="pr-status">{t('verify.predicates.states.needsGraph')}</p>}
       </section>
 
+    </div>
+    <div className="vf-out">
       {result && (
         <section className="pr-result" aria-live="polite">
           <h3>{t('verify.predicates.result')}</h3>
@@ -130,15 +133,9 @@ export default function Predicates({ filePath, blocked = false, onUseInCtl }) {
             <button type="button" className="pr-run" onClick={() => onUseInCtl?.(useQuery)}>{t('verify.predicates.useInCtl')}</button>
             <button type="button" className="pr-secondary" onClick={() => copy(result.dsl)}>{t('verify.predicates.copyDsl')}</button>
           </div>
-
-          <details className="pr-pdc">
-            <summary>{t('verify.predicates.pdc')}</summary>
-            <p className="pr-desc">{t('verify.predicates.pdcDesc')}</p>
-            <pre className="pr-code">{result.pdc}</pre>
-            <button type="button" className="pr-secondary" onClick={() => copy(result.pdc)}>{t('verify.predicates.copyPdc')}</button>
-          </details>
         </section>
       )}
+    </div>
     </div>
   );
 }

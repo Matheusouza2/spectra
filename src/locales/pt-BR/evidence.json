@@ -40,5 +40,13 @@
   "result": "Resultado",
   "proofKindLabel": "Tipo",
   "all": "Todos",
-  "filter": "Filtrar por veredito"
+  "filter": "Filtrar por veredito",
+  "scope": "Escopo",
+  "scopeExact": "Espaço de estados exato",
+  "scopeStructural": "Estrutural, sem espaço de estados",
+  "coverage": "O que esta prova cobre",
+  "copy": "Copiar certificado",
+  "copied": "Certificado copiado",
+  "copyFailed": "Não foi possível copiar o certificado",
+  "needsGraph": "Os certificados de limitação, vivacidade, deadlocks e reversibilidade ficam inconclusivos até o grafo ser gerado na aba Graphs. Eles se atualizam sozinhos depois disso."
 }

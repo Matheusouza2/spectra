@@ -13,5 +13,6 @@
   "transitions": "Transitions",
   "bounded": "Bounded",
   "live": "Live",
-  "safe": "Safe"
+  "safe": "Safe",
+  "verdicts": "Verdicts"
 }

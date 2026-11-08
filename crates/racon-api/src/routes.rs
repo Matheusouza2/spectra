@@ -67,6 +67,10 @@ pub fn router(state: ApiState) -> Router {
             "/v1/sessions/{session_id}/transitions/{transition}/dead",
             get(transition_dead),
         )
+        .route(
+            "/v1/sessions/{session_id}/algorithms/{algorithm}",
+            post(run_advanced_algorithm),
+        )
         .route("/v1/analysis/algorithms", get(algorithm_catalog))
         .route("/v1/analysis/config/validate", post(validate_config))
         .route("/v1/analyses/{analysis_id}/status", get(analysis_status))
@@ -617,6 +621,48 @@ async fn transition_dead(
             _ => StatusCode::UNPROCESSABLE_ENTITY,
         };
         ApiError::new(status, error.code(), error.to_string())
+    })
+}
+
+/// `POST /v1/sessions/{id}/algorithms/{algorithm}` — symbolic state spaces
+/// (`symbolic_mdd`, `symbolic_bdd`), `unfolding_prefix`, `structural_rules`,
+/// `polyhedral_abstraction`, `coverability_grvb` and `coverability_mp`. The
+/// optional JSON body is [`racon_engine::AdvancedParams`]. Preconditions that
+/// fail answer 422 `UNSUPPORTED`; exhausted budgets 422
+/// `RESOURCE_LIMIT_EXCEEDED` (UNKNOWN, never a negative verdict).
+async fn run_advanced_algorithm(
+    State(state): State<ApiState>,
+    Path((session_id, algorithm)): Path<(String, String)>,
+    body: Bytes,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let session = state.sessions.get(&session_id).ok_or_else(|| {
+        ApiError::new(
+            StatusCode::NOT_FOUND,
+            "SESSION_NOT_FOUND",
+            format!("Session {session_id} was not found"),
+        )
+    })?;
+    let params: racon_engine::AdvancedParams = if body.is_empty() {
+        Default::default()
+    } else {
+        serde_json::from_slice(&body)
+            .map_err(|e| ApiError::new(StatusCode::BAD_REQUEST, "BAD_REQUEST", format!("invalid body: {e}")))?
+    };
+    let net = session.net();
+    let outcome = tokio::task::spawn_blocking(move || racon_engine::run_advanced(&net, &algorithm, &params))
+        .await
+        .map_err(|error| {
+            ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", format!("worker failed: {error}"))
+        })?;
+    outcome.map(Json).map_err(|error| {
+        let status = match error {
+            racon_engine::AdvancedError::UnknownAlgorithm(_) => StatusCode::NOT_FOUND,
+            racon_engine::AdvancedError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            racon_engine::AdvancedError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
+        };
+        let code = error.code();
+        ApiError::new(status, code, error.message().to_owned())
     })
 }
 

@@ -29,7 +29,21 @@ impl Translator {
                 max,
             } => Self::translate_interval(place_name, *min, *max, net),
 
+            DslExpr::Linear { terms, op, constant } => {
+                Self::translate_linear(terms, *op, *constant, net)
+            }
+
             DslExpr::Enabled(names) => Self::translate_enabled(names, net),
+
+            // deadlock = no transition enabled (an empty net is trivially in deadlock)
+            DslExpr::Deadlock => {
+                let names: Vec<String> = net.transitions().iter().map(|t| t.name.clone()).collect();
+                if names.is_empty() {
+                    return Ok(CTLFormula::True);
+                }
+                let any_enabled = Self::translate_enabled(&names, net)?;
+                Ok(CTLFormula::Not(Box::new(any_enabled)))
+            }
 
             DslExpr::Not(inner) => {
                 let inner = Self::translate_expr(inner, net)?;
@@ -157,6 +171,40 @@ impl Translator {
             .into_iter()
             .reduce(|left, right| CTLFormula::Or(Box::new(left), Box::new(right)))
             .ok_or_else(|| DslParseError::SemanticError("enabled() needs at least one transition".into()))
+    }
+
+    fn translate_linear(
+        terms: &[(String, i64)],
+        op: DslCompOp,
+        constant: i64,
+        net: &PetriNet,
+    ) -> Result<CTLFormula, DslParseError> {
+        let mut merged: Vec<PredicateTerm> = Vec::new();
+        for (name, coefficient) in terms {
+            let place_id = Self::resolve_place(name, net)?;
+            match merged.iter_mut().find(|t| t.place_id == place_id) {
+                Some(term) => term.coefficient = term.coefficient.saturating_add(*coefficient),
+                None => merged.push(PredicateTerm { place_id, coefficient: *coefficient }),
+            }
+        }
+        merged.retain(|t| t.coefficient != 0);
+        if merged.is_empty() {
+            // Places cancelled out (or none): the atom is the constant comparison 0 ⋈ k.
+            let holds = match op {
+                DslCompOp::Eq => 0 == constant,
+                DslCompOp::Neq => 0 != constant,
+                DslCompOp::Lt => 0 < constant,
+                DslCompOp::Le => 0 <= constant,
+                DslCompOp::Gt => 0 > constant,
+                DslCompOp::Ge => 0 >= constant,
+            };
+            return Ok(if holds { CTLFormula::True } else { CTLFormula::False });
+        }
+        Ok(CTLFormula::AtomicProposition(AtomicPredicate {
+            terms: merged,
+            operator: Self::map_op(&op),
+            constant,
+        }))
     }
 
     fn resolve_place(name: &str, net: &PetriNet) -> Result<PlaceId, DslParseError> {

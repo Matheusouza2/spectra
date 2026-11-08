@@ -95,6 +95,25 @@ The process stays active until Ctrl+C. `/v1/health` reports service status.
 Analysis routes cover net loading, properties, invariants, state-space
 exploration, the algorithm catalog, job status, and cancellation.
 
+## License
+
+RACoN is free software licensed under the
+[GNU Affero General Public License v3.0 or later](LICENSE) (AGPL-3.0-or-later).
+You may use, study, modify, and redistribute it. If you distribute a modified
+version, or offer one to users over a network, you must make the complete
+corresponding source code available under the same license. Third-party
+dependencies keep their own licenses.
+
+Commercial licensing for use outside these terms is available from the author.
+
+## How to cite
+
+RACoN was developed as part of academic research. If you use it in a
+publication, thesis, or derived work, please cite the associated dissertation
+or article (see [`CITATION.cff`](CITATION.cff); GitHub shows a "Cite this
+repository" button), in addition to the software itself. Plain-text and
+BibTeX formats are generated from that file.
+
 ## Downloads and GitHub Pages
 
 Pushing to `main` builds Windows, Linux, and macOS bundles and publishes them

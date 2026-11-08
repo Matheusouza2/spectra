@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+mod advanced;
 mod dead_transition;
 mod inference;
 mod invariants;
@@ -8,6 +9,7 @@ mod properties;
 mod session;
 mod state_space;
 
+pub use advanced::{run_advanced, AdvancedError, AdvancedParams, ADVANCED_ALGORITHMS};
 pub use dead_transition::{
     resolve_transition, DeadTransitionDto, DeadTransitionError, DEAD_TRANSITION_MAX_NODES,
 };

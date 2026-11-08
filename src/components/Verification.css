@@ -6,3 +6,26 @@
 .vf-switch button { padding: var(--space-2) var(--space-4); font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); border-radius: var(--radius-sm); cursor: pointer; }
 .vf-switch button.on { background: var(--bg-surface); color: var(--text-main); box-shadow: var(--shadow-sm); font-weight: 600; }
 .vf-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ── Query pages: inputs on the left, answer on the right ──
+ * Every query after the CTL formula shares this split, so the width of the
+ * screen is used the way the CTL page uses it (work area + side column). */
+.vf .vf-split {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.1fr);
+  gap: var(--space-8);
+  align-items: start;
+  max-width: none;
+}
+.vf-in, .vf-out { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.vf-in { max-width: 640px; }
+.vf-out { position: sticky; top: var(--space-4); }
+/* Until there is an answer, keep the column visibly reserved rather than blank. */
+.vf-out:empty { min-height: 160px; border: 1px dashed var(--border); border-radius: var(--radius-md); }
+
+@media (max-width: 1000px) {
+  .vf .vf-split { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  .vf-in { max-width: none; }
+  .vf-out { position: static; }
+  .vf-out:empty { display: none; }
+}

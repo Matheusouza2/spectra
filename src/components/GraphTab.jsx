@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { getReachabilityGraph, getCoverageTree, getMinimalCoverabilitySet } from '../services/tauri-api';
-import AlgorithmPanel from './AlgorithmPanel';
+import { getReachabilityGraph, getCoverageTree, getMinimalCoverabilitySet, runAdvancedAnalysis } from '../services/tauri-api';
+import AlgorithmPanel, { SET_METHOD_IDS } from './AlgorithmPanel';
 import { loadGraphGenerationConfig, saveGraphGenerationConfig, validateGraphGenerationConfig } from '../services/graph-config';
 import { useToast } from './Toast';
 import useAnalysisGraph from '../hooks/useAnalysisGraph';
@@ -9,7 +9,7 @@ import './GraphViewer.css';
 
 const LEVEL_STEP = 5;
 
-const GraphTab = ({ filePath, analysisData, bounded = null, extended = false, onGraphProperties, transitionNames }) => {
+const GraphTab = ({ filePath, analysisData, bounded = null, extended = false, onGraphProperties, onGraphGenerated, transitionNames }) => {
   const [graphData, setGraphData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [graphType, setGraphType] = useState(null);
@@ -66,15 +66,22 @@ const GraphTab = ({ filePath, analysisData, bounded = null, extended = false, on
     };
     saveGraphGenerationConfig(limits);
     setConfig(limits);
-    const normalizedConfig = { ...limits, algorithm: selection.exploration, stubborn: selection.stubborn };
+    const normalizedConfig = { ...limits, algorithm: selection.exploration, stubborn: selection.stubborn, symmetry: selection.symmetry };
     const mode = selection.exploration.startsWith('reachability') ? 'reachability' : 'coverage';
-    const isMincov = selection.exploration === 'coverability_mincov';
+    const isSetMethod = SET_METHOD_IDS.has(selection.exploration);
+    const isMincov = selection.exploration === 'coverability_mincov' || isSetMethod;
     setRequestedType(isMincov ? 'mincov' : mode);
     setLoading(true);
     setError(null);
     try {
       if (isMincov) {
-        const data = await getMinimalCoverabilitySet(filePath, normalizedConfig);
+        let data;
+        if (isSetMethod) {
+          const result = await runAdvancedAnalysis(filePath, selection.exploration, { limit: limits.maxNodes });
+          data = { ...result.summary, elapsed_ms: result.elapsed_ms, method: result.name };
+        } else {
+          data = await getMinimalCoverabilitySet(filePath, normalizedConfig);
+        }
         if (requestIdRef.current !== requestId) return;
         setGraphData(null);
         setGraphType(null);
@@ -87,8 +94,10 @@ const GraphTab = ({ filePath, analysisData, bounded = null, extended = false, on
         setCoverSet(null);
         setGraphData(data);
         setGraphType(mode);
+        // The backend saves complete, unreduced graphs; the app learns about it here.
+        onGraphGenerated?.(mode);
         // A complete, unreduced reachability graph settles DSt / DTr / REV for the Analysis tab.
-        if (mode === 'reachability' && !data.display_truncated && !selection.stubborn) {
+        if (mode === 'reachability' && !data.display_truncated && !selection.stubborn && !selection.symmetry) {
           onGraphProperties?.(data);
         }
         setSelectedNode(null);
@@ -103,7 +112,7 @@ const GraphTab = ({ filePath, analysisData, bounded = null, extended = false, on
     } finally {
       if (requestIdRef.current === requestId) setLoading(false);
     }
-  }, [filePath, loading, config, addToast, setSelectedNode, t, tm]);
+  }, [filePath, loading, config, addToast, setSelectedNode, t, tm, onGraphGenerated, onGraphProperties]);
 
   useEffect(() => {
     if (!graphData || !graphData.nodes || !graphData.nodes.length) return;
@@ -188,7 +197,7 @@ const GraphTab = ({ filePath, analysisData, bounded = null, extended = false, on
     <>
       {lastRun && (
         <div className="gv-notice" role="note">
-          {t('graphs.ranWith')} <strong>{lastRun.exploration}</strong>{lastRun.stubborn ? ' + stubborn sets' : ''}
+          {t('graphs.ranWith')} <strong>{lastRun.exploration}</strong>{lastRun.stubborn ? ' + stubborn sets' : ''}{lastRun.symmetry ? ' + symmetry' : ''}
           {lastRun.experimental ? ` — ${t('graphs.experimental')}` : '.'}
           {lastRun.doesNotPreserve?.length > 0 && <> {t('graphs.doNotConclude')}: {lastRun.doesNotPreserve.map(tm).join(', ')}.</>}
         </div>
@@ -207,7 +216,7 @@ const GraphTab = ({ filePath, analysisData, bounded = null, extended = false, on
   } else if (coverSet) {
     viewport = (
       <div className="gv-cover" aria-label={t('graphs.minCovTitle')}>
-        <h4>{t('graphs.minCovTitle')} (MinCov) — {coverSet.bounded ? t('graphs.netBounded') : t('graphs.netUnbounded')}</h4>
+        <h4>{t('graphs.minCovTitle')} ({coverSet.method || 'MinCov'}) — {coverSet.bounded ? t('graphs.netBounded') : t('graphs.netUnbounded')}</h4>
         <p>
           {t('graphs.minCovStats', { markings: coverSet.elements.length, vertices: coverSet.tree_vertices, accelerations: coverSet.accelerations, ms: coverSet.elapsed_ms })}
           {coverSet.unbounded_places.length > 0 && <> {t('graphs.unboundedPlaces')}: {coverSet.unbounded_places.join(', ')}.</>}

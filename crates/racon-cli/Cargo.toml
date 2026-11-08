@@ -2,6 +2,7 @@
 name = "racon-cli"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
 description = "Explicit CLI bootstrap for the RACoN HTTP API"
 
 [[bin]]

@@ -3,6 +3,7 @@ import { invokeLogged as invoke } from './app-logger';
 export const analyzePnt = (filePath) => invoke('analyze_pnt', { filePath: filePath });
 export const getRequiredInitialProperties = (filePath) => invoke('get_required_initial_properties', { filePath });
 export const getDeadlockTrapProperty = (filePath) => invoke('get_deadlock_trap_property', { filePath });
+export const getGraphCacheStatus = (filePath) => invoke('get_graph_cache_status', { filePath });
 export const getAnalysisEvidence = (filePath) => invoke('get_analysis_evidence', { filePath });
 export const getReachabilityGraph = (filePath, config) => invoke('get_reachability_graph', { filePath, config });
 export const getReachabilityGraphPage = (filePath, offset = 0, limit = 500, config) =>
@@ -43,6 +44,8 @@ export const getAlgorithmCatalog = () => invoke('get_algorithm_catalog');
 export const validateAnalysisConfig = (config) => invoke('validate_analysis_config', { config });
 export const getMinimalCoverabilitySet = (filePath, config) =>
   invoke('get_minimal_coverability_set', { filePath, config });
+export const runAdvancedAnalysis = (filePath, algorithm, params = {}) =>
+  invoke('run_advanced_analysis', { filePath, algorithm, params });
 export const checkPlaceBoundedness = (filePath, place, config) =>
   invoke('check_place_boundedness', { filePath, place, config });
 export const checkTransitionDead = (filePath, transition, config) =>

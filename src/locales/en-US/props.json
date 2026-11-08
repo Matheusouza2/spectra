@@ -104,13 +104,9 @@
   "info.selfLoops": "Self-loops",
   "info.none": "None",
   "behavior": {
-    "compute": "Compute behavioral properties",
-    "recompute": "Recompute",
     "computing": "Computing…",
     "done": "Computed on the complete reachability graph.",
-    "blocked.loading": "Waiting for the boundedness check.",
-    "blocked.unbounded": "Unavailable: the net is unbounded.",
-    "blocked.unknown": "Unavailable: boundedness was not proven."
+    "waiting": "Open the Graphs tab and generate the reachability graph to fill in the properties below."
   },
   "scc.count": "Strongly connected components",
   "scc.desc": "Maximal sets of states that can all reach one another.",

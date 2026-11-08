@@ -1,0 +1,29 @@
+{
+  "tooltip": "SPECTRA",
+  "show": "Show SPECTRA",
+  "quit": "Quit",
+  "doneTitle": "Analysis finished",
+  "doneBody": "{task} finished in {seconds} s.",
+  "failedTitle": "Analysis failed",
+  "failedBody": "{task} stopped after {seconds} s with an error.",
+  "tasks": {
+    "analyze_pnt": "Net analysis",
+    "get_reachability_graph": "Reachability graph",
+    "get_reachability_graph_page": "Reachability graph",
+    "get_coverage_tree": "Coverability tree",
+    "get_minimal_coverability_set": "Minimal coverability set",
+    "check_ctl_formula": "CTL verification",
+    "check_bad_states": "Bad-state check",
+    "compute_behavioral_properties": "Behavioral properties",
+    "check_marking_reachability": "Marking reachability",
+    "check_marking_coverability": "Marking coverability",
+    "compute_distances": "Distance computation",
+    "compute_circuits": "Circuit computation",
+    "build_predicate": "Predicate construction",
+    "check_cycle_fairness": "Cycle fairness check",
+    "check_place_boundedness": "Boundedness check",
+    "check_transition_dead": "Dead-transition check",
+    "get_invariants": "Invariant computation",
+    "get_structural_properties": "Structural analysis"
+  }
+}

@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use RACoN in your research, please cite it using the metadata below, and cite the associated dissertation or article when available."
+title: "RACoN: Reachability And Coverability Net Analyzer"
+type: software
+authors:
+  - family-names: "Souza"
+    given-names: "Matheus"
+    email: "matheusouza1997@gmail.com"
+license: AGPL-3.0-or-later
+version: "0.1.0"
+# TODO: fill in once available.
+# repository-code: "https://github.com/<user>/racon"
+# date-released: "YYYY-MM-DD"
+# preferred-citation:
+#   type: thesis            # use "article" for a paper
+#   title: "<dissertation or article title>"
+#   authors:
+#     - family-names: "Souza"
+#       given-names: "Matheus"
+#   institution:
+#     name: "<university>"
+#   year: YYYY
+#   # doi / url: ...

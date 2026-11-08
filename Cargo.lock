@@ -584,6 +584,7 @@ dependencies = [
  "racon-reduction",
  "racon-structural",
  "serde",
+ "serde_json",
  "tokio",
 ]
 

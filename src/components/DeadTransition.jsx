@@ -43,7 +43,8 @@ export default function DeadTransition({ filePath, extended = false }) {
 
   const tone = result ? (result.dead === true ? 'missing' : result.dead === false ? 'found' : 'unknown') : null;
   return (
-    <div className="pb">
+    <div className="pb vf-split">
+    <div className="vf-in">
       <p className="pb-note">{t('verify.deadTransition.hint')}</p>
       <div className="pb-actions">
         <label className="pb-field">
@@ -57,6 +58,8 @@ export default function DeadTransition({ filePath, extended = false }) {
         </button>
       </div>
       {extended && <p className="pb-note">{t('reduction.plainOnly')}</p>}
+    </div>
+    <div className="vf-out">
       {result && (
         <section className={`pb-result ${tone}`} aria-live="polite">
           <strong>
@@ -73,6 +76,7 @@ export default function DeadTransition({ filePath, extended = false }) {
           {result.dead === null && <p>{t('verify.deadTransition.unknownDesc', { count: result.visited })}</p>}
         </section>
       )}
+    </div>
     </div>
   );
 }

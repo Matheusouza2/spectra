@@ -3,14 +3,17 @@ import './AnalysisOverview.css';
 import { markingToString } from '../services/token-value';
 import { useI18n } from '../i18n/I18nContext';
 
-function StatusPill({ label, value, pending, settled }) {
-  const { t, tm } = useI18n();
+// One verdict per cell: the colour bar and the word carry the result, the dot is redundant on purpose
+// so the state never depends on colour alone.
+function Verdict({ label, value, pending, settled }) {
+  const { t } = useI18n();
   const known = typeof value === 'boolean';
+  const tone = known ? (value ? 'good' : 'bad') : pending ? 'pending' : settled ? 'inconclusive' : 'unknown';
+  const word = known ? (value ? t('common.yes') : t('common.no')) : pending ? '…' : settled ? t('common.inconclusive') : '—';
   return (
-    <div className={`analysis-status ${known ? (value ? 'is-good' : 'is-bad') : pending ? 'is-pending' : settled ? 'is-inconclusive' : 'is-unknown'}`} aria-busy={pending && !known}>
-      <span className="analysis-status-dot" />
-      <span>{label}</span>
-      <strong title={!known && settled ? t('common.inconclusiveHint') : undefined}>{known ? (value ? t('common.yes') : t('common.no')) : pending ? '…' : settled ? `? ${t('common.inconclusive')}` : '—'}</strong>
+    <div className={`ao-verdict is-${tone}`} aria-busy={pending && !known} title={!known && settled ? t('common.inconclusiveHint') : undefined}>
+      <span className="ao-verdict-label">{label}</span>
+      <strong className="ao-verdict-word">{word}</strong>
     </div>
   );
 }
@@ -44,41 +47,39 @@ export default function AnalysisOverview({ data, requiredProperties, pending = f
     state_space_unavailable: 'overview.status.unavailable',
   }[data?.analysis_status];
   const status = statusKey ? t(statusKey) : data?.analysis_status || t('overview.status.available');
+  const partial = Boolean(data?.analysis_message) || /limit|cancel|unavailable/.test(data?.analysis_status || '');
+
+  const counts = [
+    ['places', data?.net_places],
+    ['transitions', data?.net_transitions],
+  ];
 
   return (
-    <section className="analysis-overview" aria-label={t('overview.ariaLabel')}>
-      <div className="analysis-overview-heading">
-        <div>
-          <span className="analysis-eyebrow">{t('overview.eyebrow')}</span>
-          <h1>{t('overview.title')}</h1>
-          <p className={data?.analysis_message ? 'analysis-overview-message' : undefined}>
-            {tm(data?.analysis_message) || status.replaceAll('_', ' ')}
-          </p>
-        </div>
-        <div className="analysis-m0-chip">
-          <span>M₀</span>
-          <code>{marking}</code>
-        </div>
+    <section className="ao" aria-label={t('overview.ariaLabel')}>
+      <div className="ao-lead">
+        <h1 className="ao-title">{t('overview.title')}</h1>
+        <p className={`ao-status${partial ? ' is-partial' : ''}`}>
+          {tm(data?.analysis_message) || status.replaceAll('_', ' ')}
+        </p>
       </div>
 
-      <div className="analysis-kpis">
-        <div className="analysis-kpi">
-          <span>{t('overview.states')}</span>
-          <strong>{data?.analysis_info?.num_states ?? '—'}</strong>
+      <dl className="ao-figures">
+        {counts.map(([key, value]) => (
+          <div key={key} className="ao-figure">
+            <dt>{t(`overview.${key}`)}</dt>
+            <dd>{value ?? '—'}</dd>
+          </div>
+        ))}
+        <div className="ao-figure ao-marking">
+          <dt>M₀</dt>
+          <dd><code>{marking}</code></dd>
         </div>
-        <div className="analysis-kpi">
-          <span>{t('overview.places')}</span>
-          <strong>{data?.net_places ?? '—'}</strong>
-        </div>
-        <div className="analysis-kpi">
-          <span>{t('overview.transitions')}</span>
-          <strong>{data?.net_transitions ?? '—'}</strong>
-        </div>
-        <div className="analysis-kpi analysis-kpi-status">
-          <StatusPill label={t('overview.bounded')} value={status3.bounded} pending={pending} settled={settled} />
-          <StatusPill label={t('overview.live')} value={status3.live} pending={pending} settled={settled} />
-          <StatusPill label={t('overview.safe')} value={status3.safe} pending={pending} settled={settled} />
-        </div>
+      </dl>
+
+      <div className="ao-verdicts" role="group" aria-label={t('overview.verdicts')}>
+        <Verdict label={t('overview.bounded')} value={status3.bounded} pending={pending} settled={settled} />
+        <Verdict label={t('overview.live')} value={status3.live} pending={pending} settled={settled} />
+        <Verdict label={t('overview.safe')} value={status3.safe} pending={pending} settled={settled} />
       </div>
     </section>
   );

@@ -168,12 +168,12 @@ impl CTLEngineImpl {
 
             CTLFormula::EX(inner) => {
                 let inner_set = self.eval(inner, ss, n, ctx)?;
-                Ok(self.compute_ex(&inner_set, ss, n))
+                Ok(self.compute_next(&inner_set, ss, n, true))
             }
 
             CTLFormula::AX(inner) => {
                 let inner_set = self.eval(inner, ss, n, ctx)?;
-                Ok(self.compute_ax(&inner_set, ss, n))
+                Ok(self.compute_next(&inner_set, ss, n, false))
             }
 
             CTLFormula::EF(inner) => {
@@ -274,9 +274,9 @@ impl CTLEngineImpl {
                             TokenValue::Exact(c) => i64::try_from(c).unwrap_or(i64::MAX),
                             TokenValue::Omega => i64::MAX,
                         };
-                        term.coefficient * tokens
+                        term.coefficient.saturating_mul(tokens)
                     })
-                    .sum();
+                    .fold(0i64, |acc, value| acc.saturating_add(value));
 
                 match pred.operator {
                     ComparisonOp::Eq => sum == pred.constant,
@@ -324,23 +324,29 @@ impl CTLEngineImpl {
         result
     }
 
-    /// AX φ: States where ALL successors are in φ.
-    /// States with no successors vacuously satisfy AX φ.
-    fn compute_ax(&self, phi: &FixedBitSet, ss: &dyn StateSpace, n: usize) -> FixedBitSet {
-        let mut result = FixedBitSet::with_capacity(n);
-        let indices: Vec<_> = (0..n).collect();
-
-        let ax_bits: Vec<bool> = indices
-            .par_iter()
-            .map(|&i| {
-                let node_id = NodeId(i as u32);
-                self.ctl_successors(ss, node_id)
-                    .iter()
-                    .all(|&succ| phi.contains(succ.0 as usize))
+    /// Literal EX / AX over the real transition relation (paper semantics, Table 1):
+    /// at a deadlock `EX φ` is false and `AX φ` is vacuously true. The fixed points
+    /// use `compute_ex` (deadlock self-loop) instead, which matches maximal-path semantics.
+    fn compute_next(
+        &self,
+        phi: &FixedBitSet,
+        ss: &dyn StateSpace,
+        n: usize,
+        existential: bool,
+    ) -> FixedBitSet {
+        let bits: Vec<bool> = (0..n)
+            .into_par_iter()
+            .map(|i| {
+                let successors = ss.successors(NodeId(i as u32));
+                if existential {
+                    successors.iter().any(|s| phi.contains(s.0 as usize))
+                } else {
+                    successors.iter().all(|s| phi.contains(s.0 as usize))
+                }
             })
             .collect();
-
-        for (i, &holds) in ax_bits.iter().enumerate() {
+        let mut result = FixedBitSet::with_capacity(n);
+        for (i, &holds) in bits.iter().enumerate() {
             if holds {
                 result.insert(i);
             }
@@ -472,8 +478,8 @@ impl CTLEngineImpl {
                 }
                 CTLFormula::EX(inner) => {
                     let target_set = self.eval(inner, ss, ss.node_count(), ctx)?;
-                    if let Some(&target) = self
-                        .ctl_successors(ss, init)
+                    if let Some(&target) = ss
+                        .successors(init)
                         .iter()
                         .find(|node| target_set.contains(node.0 as usize))
                     {
@@ -542,8 +548,8 @@ impl CTLEngineImpl {
                 }
                 CTLFormula::AX(inner) => {
                     let inner_set = self.eval(inner, ss, ss.node_count(), ctx)?;
-                    if let Some(&target) = self
-                        .ctl_successors(ss, init)
+                    if let Some(&target) = ss
+                        .successors(init)
                         .iter()
                         .find(|node| !inner_set.contains(node.0 as usize))
                     {

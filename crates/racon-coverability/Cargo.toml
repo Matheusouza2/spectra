@@ -2,6 +2,7 @@
 name = "racon-coverability"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 racon-core = { path = "../racon-core" }

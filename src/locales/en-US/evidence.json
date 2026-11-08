@@ -40,5 +40,13 @@
   "result": "Result",
   "proofKindLabel": "Kind",
   "all": "All",
-  "filter": "Filter by verdict"
+  "filter": "Filter by verdict",
+  "scope": "Scope",
+  "scopeExact": "Exact state space",
+  "scopeStructural": "Structural, no state space",
+  "coverage": "What this proof covers",
+  "copy": "Copy certificate",
+  "copied": "Certificate copied",
+  "copyFailed": "Could not copy the certificate",
+  "needsGraph": "The certificates for boundedness, liveness, deadlocks and reversibility are inconclusive until the graph is generated in the Graphs tab. They update on their own once it is."
 }

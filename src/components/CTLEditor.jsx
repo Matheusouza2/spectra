@@ -41,7 +41,8 @@ function highlight(text) {
 // CTL formula in Portuguese DSL:
 //   formula := quantifier temporal (condition)
 //   quantifier := "para todo caminho" | "existe caminho"
-//   temporal  := "sempre" (AG) | "eventualmente" (EF) | "próximo" (EX) | "até" (EU)
+//   temporal  := "sempre" (AG) | "eventualmente" (EF) | "próximo" (EX)
+//   until     := quantifier (condition) "até" (condition)      -- E[φ U ψ] / A[φ U ψ]
 //   condition := proposition | "nao" proposition
 //   proposition := TRUE | FALSE | place_expr
 //   place_expr := "p<idx> = <int>"
@@ -56,111 +57,115 @@ function buildExamples(placeNames = [], dsl, transitionNames = []) {
 }
 
 // ── Context-sensitive autocomplete ──
+// Scans the text before the caret into tokens and derives what the grammar allows next,
+// so the list only offers valid continuations (never the whole vocabulary).
 
-function tokenize(text) {
-  return text.split(/\s+/).filter(Boolean);
-}
+const QUANT_RE = /^\s*(for\s+all\s+paths?|exists\s+(?:a\s+)?path|para\s+todos?\s+(?:os\s+)?caminhos?|existe\s+(?:um\s+)?caminho)(?![\p{L}\d_])/iu;
+const TOKEN_SCAN_RE = /\s*(<=|>=|!=|=|<|>|\(|\)|,|\d+|[\p{L}_][\p{L}\d_]*)/gyu;
+const TEMPORAL_WORDS = new Set(['always', 'eventually', 'next', 'sempre', 'eventualmente', 'próximo', 'proximo']);
+const UNTIL_WORDS = new Set(['until', 'até', 'ate']);
+const NOT_WORDS = new Set(['not', 'nao', 'não']);
+const AND_WORDS = new Set(['and', 'e']);
+const OR_WORDS = new Set(['or', 'ou']);
+const ENABLED_WORDS = new Set(['enabled', 'habilitada']);
+const COMPARATORS = ['=', '!=', '<', '>', '<=', '>='];
 
-function lastWord(text, caretPos) {
+// Returns { items, start }: the suggestions and where in the text the accepted one replaces from.
+function completionsAt(text, caretPos, { placeNames = [], transitionNames = [] }, dsl) {
   const before = text.slice(0, caretPos);
-  const match = before.match(/(\S+)$/);
-  return match ? match[1].toLowerCase() : '';
-}
+  const quantifiers = [dsl.forAll, dsl.exists];
 
-function textBeforeCaret(text, caretPos) {
-  return text.slice(0, caretPos).toLowerCase();
-}
-
-function currentContext(text, caretPos, dsl) {
-  const before = textBeforeCaret(text, caretPos);
-  const tokens = tokenize(before);
-  if (tokens.length === 0) return 'start';
-
-  const last = tokens[tokens.length - 1];
-
-  // After binary operator → new formula
-  if (last === dsl.and.toLowerCase() || last === dsl.or.toLowerCase()) return 'start';
-
-  // Check if we're inside a parenthesized condition
-  const parenDepth = (before.match(/\(/g) || []).length - (before.match(/\)/g) || []).length;
-  if (parenDepth > 0) {
-    // Inside condition parent — check what came before
-    const beforeParen = before.lastIndexOf('(');
-    const insideParen = before.slice(beforeParen + 1).trim();
-
-    // After 'nao ' → show conditions
-    if (dsl.notPrefixRegex.test(insideParen)) return 'conditions';
-
-    // After '=' → show number
-    if (insideParen.endsWith('=')) return 'number';
-
-    // After a place name pattern like 'p0 p1' → show 'E', 'OU' or ')'
-    if (/p\d+\s*=?\s*\d*$/.test(insideParen)) {
-      const afterEq = insideParen.split('=');
-      if (afterEq.length > 1 && afterEq[1].trim().length > 0) return 'operators';
-      if (afterEq.length > 1) return 'number';
-      return 'conditions';
-    }
-
-    // Inside paren, typing a place name
-    if (insideParen.match(/p\d*\s*$/)) return 'placeNames';
-
-    // General condition keywords
-    return 'conditions';
+  const quant = before.match(QUANT_RE);
+  if (!quant || quant[0].length === before.length) {
+    // Still writing (or just finished) the path quantifier.
+    const start = before.length - before.trimStart().length;
+    const typed = before.slice(start).toLowerCase();
+    return { items: quantifiers.filter((q) => q.toLowerCase().startsWith(typed)), start };
   }
 
-  // After quantifier → show temporal operators
-  if (dsl.afterQuantifierRegex.test(before)) return 'afterPath';
+  const rest = before.slice(quant[0].length);
+  const partial = (rest.match(/[\p{L}\d_]+$/u) || [''])[0];
+  const head = rest.slice(0, rest.length - partial.length);
 
-  // After temporal → expect '('
-  const hasTemporal = Object.values(dsl.temporal).map((w) => w.toLowerCase()).some((t) =>
-    before.endsWith(t) || before.endsWith(t + ' ')
-  );
-  if (hasTemporal) return 'expectParen';
+  let state = 'afterQuant';
+  let hasTemporal = false;
+  const stack = [];
+  let pendingEnabled = false;
+  TOKEN_SCAN_RE.lastIndex = 0;
+  let m;
+  while ((m = TOKEN_SCAN_RE.exec(head)) !== null) {
+    const tok = m[1];
+    const w = tok.toLowerCase();
+    if (tok === '(') {
+      stack.push(pendingEnabled ? 'enabled' : 'group');
+      state = pendingEnabled ? 'enabledArg' : 'expr';
+      pendingEnabled = false;
+    } else if (tok === ')') {
+      stack.pop();
+      state = 'afterExpr';
+    } else if (tok === ',') {
+      state = 'enabledArg';
+    } else if (COMPARATORS.includes(tok)) {
+      state = 'afterOp';
+    } else if (/^\d+$/.test(tok)) {
+      state = 'afterExpr';
+    } else if (state === 'enabledArg') {
+      state = 'enabledNext';
+    } else if (TEMPORAL_WORDS.has(w)) {
+      hasTemporal = true;
+      state = 'expr';
+    } else if (UNTIL_WORDS.has(w) || NOT_WORDS.has(w) || AND_WORDS.has(w) || OR_WORDS.has(w)) {
+      state = 'expr';
+    } else if (w === 'true' || w === 'false') {
+      state = 'afterExpr';
+    } else if (ENABLED_WORDS.has(w)) {
+      pendingEnabled = true;
+    } else {
+      state = 'afterPlace'; // a place name
+    }
+  }
+  if (pendingEnabled) state = 'afterEnabledWord';
 
-  return 'start';
-}
-
-function filterSuggestions(context, partial, placeNames, dsl) {
-  const { always, eventually, next, until } = dsl.temporal;
-  const lower = partial.toLowerCase();
-
-  // Build pool based on context
+  const t = dsl.temporal;
+  const enabledWord = dsl.enabledExample.split('(')[0];
   let pool;
-  switch (context) {
-    case 'start':
-      pool = [dsl.forAll, dsl.exists];
+  switch (state) {
+    case 'afterQuant':
+      pool = [t.always, t.eventually, t.next, '('];
       break;
-    case 'afterPath':
-      pool = [`${always} (`, `${eventually} (`, `${next} (`, `${until} (`];
+    case 'expr':
+      pool = ['TRUE', 'FALSE', dsl.not, '(', `${enabledWord}(`, ...placeNames];
       break;
-    case 'expectParen':
-      pool = ['('];
+    case 'afterPlace':
+      pool = COMPARATORS;
       break;
-    case 'conditions':
-      pool = [
-        'TRUE',
-        'FALSE',
-        `${dsl.not} (`,
-        ...(placeNames || []).map((n, i) => `${n} =`),
-        ...(placeNames ? [] : ['p0 =', 'p1 =', 'p2 =']),
-      ];
-      break;
-    case 'placeNames':
-      pool = placeNames || ['p0', 'p1', 'p2', 'p3', 'p4', 'p5'];
-      break;
-    case 'number':
+    case 'afterOp':
       pool = ['0', '1', '2'];
       break;
-    case 'operators':
-      pool = [')', `${dsl.and} (`, `${dsl.or} (`];
+    case 'afterExpr': {
+      pool = [dsl.and, dsl.or];
+      if (stack.length > 0) pool.unshift(')');
+      else if (!hasTemporal) pool.unshift(t.until);
+      break;
+    }
+    case 'enabledArg':
+      pool = transitionNames;
+      break;
+    case 'enabledNext':
+      pool = [',', ')'];
+      break;
+    case 'afterEnabledWord':
+      pool = ['('];
       break;
     default:
       pool = [];
   }
 
-  if (!partial) return pool.slice(0, 7);
-  return pool.filter((s) => s.toLowerCase().includes(lower)).slice(0, 7);
+  const lower = partial.toLowerCase();
+  const items = pool.filter((s) => !lower || s.toLowerCase().startsWith(lower));
+  // Nothing left to complete once the typed word is itself the only match.
+  if (items.length === 1 && items[0].toLowerCase() === lower) return { items: [], start: caretPos - partial.length };
+  return { items: items.slice(0, 8), start: caretPos - partial.length };
 }
 
 function validateFormula(text, t, dsl) {
@@ -191,6 +196,7 @@ const CTLEditor = ({ filePath, onResult, placeNames, result, gate, embedded = fa
   const textareaRef = useRef(null);
   const mirrorRef = useRef(null);
   const validationRequestRef = useRef(0);
+  const replaceStartRef = useRef(0);
   const { addToast } = useToast();
   const { t, tm, language } = useI18n();
   const dsl = useMemo(() => dslFor(language), [language]);
@@ -199,9 +205,7 @@ const CTLEditor = ({ filePath, onResult, placeNames, result, gate, embedded = fa
 
   const updateSuggestions = useCallback(async (text, caretPos, showList = true) => {
     const requestId = ++validationRequestRef.current;
-    const ctx = currentContext(text, caretPos, dsl);
-    const partial = lastWord(text, caretPos);
-    let filtered = [];
+    const { items, start } = completionsAt(text, caretPos, { placeNames, transitionNames }, dsl);
     if (!text.trim() && requestId === validationRequestRef.current) setPreview('');
     if (filePath && text.trim()) {
       try {
@@ -212,19 +216,16 @@ const CTLEditor = ({ filePath, onResult, placeNames, result, gate, embedded = fa
             ? { valid: true, message: '' }
             : { valid: false, message: validationMessage(validationResult, t) });
         }
-        filtered = (validationResult.suggestions || []).filter((suggestion) =>
-          !partial || suggestion.toLowerCase().includes(partial.toLowerCase()),
-        );
       } catch {
-        filtered = [];
+        // validation is advisory here; completions are computed locally
       }
     }
-    if (filtered.length === 0) filtered = filterSuggestions(ctx, partial, placeNames, dsl);
     if (requestId !== validationRequestRef.current) return;
-    setSuggestions(filtered);
-    setShowSuggestions(showList && filtered.length > 0);
+    replaceStartRef.current = start;
+    setSuggestions(items);
+    setShowSuggestions(showList && items.length > 0);
     setSelectedIdx(-1);
-  }, [filePath, placeNames, t, dsl, language]);
+  }, [filePath, placeNames, transitionNames, t, dsl, language]);
 
   const handleChange = useCallback((e) => {
     const val = e.target.value;
@@ -238,19 +239,11 @@ const CTLEditor = ({ filePath, onResult, placeNames, result, gate, embedded = fa
     const ta = textareaRef.current;
     if (!ta) return;
     const caretPos = ta.selectionStart;
-    const before = formula.slice(0, caretPos);
-    const after = formula.slice(caretPos);
-    const match = before.match(/(\S+)$/);
-
-    let prefix, newFormula, newPos;
-    if (match) {
-      prefix = before.slice(0, before.length - match[1].length);
-      newFormula = prefix + suggestion + ' ' + after;
-      newPos = prefix.length + suggestion.length + 1;
-    } else {
-      newFormula = suggestion + ' ' + after;
-      newPos = suggestion.length + 1;
-    }
+    const prefix = formula.slice(0, Math.min(replaceStartRef.current, caretPos));
+    const after = formula.slice(caretPos).replace(/^[\p{L}\d_]+/u, '');
+    const glue = /[(]$/.test(suggestion) || suggestion === ')' || suggestion === ',' ? '' : ' ';
+    const newFormula = prefix + suggestion + glue + after;
+    const newPos = prefix.length + suggestion.length + glue.length;
 
     setFormula(newFormula);
     setValidation(validateFormula(newFormula, t, dsl));

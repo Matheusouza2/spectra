@@ -63,7 +63,8 @@ export default function Distances({ filePath, blocked = false }) {
   const peak = result ? Math.max(...result.histogram) : 1;
 
   return (
-    <div className="ds">
+    <div className="ds vf-split">
+    <div className="vf-in">
       <VectorField
         label={t('verify.distances.from')}
         help={t('verify.distances.fromHelp')}
@@ -91,6 +92,8 @@ export default function Distances({ filePath, blocked = false }) {
         </button>
       </div>
 
+    </div>
+    <div className="vf-out">
       {result && (
         <section className="ds-result" aria-live="polite">
           <dl className="ds-stats">
@@ -134,6 +137,7 @@ export default function Distances({ filePath, blocked = false }) {
           )}
         </section>
       )}
+    </div>
     </div>
   );
 }

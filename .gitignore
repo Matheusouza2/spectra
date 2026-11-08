@@ -40,3 +40,32 @@
 
 # Legacy standalone Java test harness
 /test-java/
+
+# AI-assistant / agent tooling (config, memory, context)
+/.opencode/
+/.agents/
+/.codex/
+/.claude/
+/CLAUDE.md
+/graphify-out/
+
+# Thesis presentation and branding guide (not needed to build or run the app)
+/Apresentação/
+/public/Guia de Identidade Visual SPECTRA.png
+
+# Empty/legacy directory
+/icons/
+
+# Secrets and local environment
+.env
+.env.*
+*.pem
+*.key
+
+# Logs, editor and OS files
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

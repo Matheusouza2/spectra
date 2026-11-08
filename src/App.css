@@ -99,6 +99,8 @@
 .tab-btn.active { color: var(--text-main); font-weight: 600; }
 .tab-btn.active::after { transform: scaleX(1); }
 .tab-btn:active:not(:disabled) { transform: none; }
+.tab-btn:disabled { color: var(--text-muted); opacity: 0.55; cursor: not-allowed; }
+.tab-btn:disabled:hover { background: transparent; color: var(--text-muted); }
 
 /* ── Content ── */
 
@@ -193,83 +195,58 @@
 }
 
 .analysis-grid {
-  display: flex;
-  gap: var(--space-4);
-  align-items: flex-start;
-  min-height: calc(100vh - 110px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+  gap: var(--space-6);
+  align-items: start;
 }
 
+/* The net is the subject of the screen: framed once, header floats over the canvas. */
 .analysis-left {
-  flex: 1;
+  position: relative;
   min-width: 0;
   overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+.analysis-left .panel-header {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 2;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 0;
+  background: linear-gradient(var(--card-bg) 55%, transparent);
+  pointer-events: none;
+}
+.analysis-left .panel-header > div { display: flex; flex-direction: column; gap: 2px; }
+.analysis-left .panel-kicker { display: none; }
+.analysis-left .panel-title { font-size: 0.9375rem; font-weight: 600; letter-spacing: 0; color: var(--text-main); text-transform: none; }
+.analysis-left .panel-hint { align-self: flex-start; padding: 2px var(--space-2); border-radius: var(--radius-full); background: var(--bg-elevated); font-size: 0.75rem; color: var(--text-muted); }
+
+.analysis-left .pnet-graph {
+  height: clamp(560px, 70vh, 860px);
+  min-height: 560px;
 }
 
 .analysis-right {
-  width: min(430px, 34vw);
-  flex-shrink: 0;
+  position: sticky;
+  top: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  max-height: calc(100vh - 110px);
+  max-height: calc(100vh - 96px);
   overflow-y: auto;
-  padding-right: var(--space-1);
+  padding-right: var(--space-2);
+  scrollbar-width: thin;
 }
 
-.analysis-right::-webkit-scrollbar {
-  width: 6px;
-}
+.analysis-properties-header { padding: 0 var(--space-1) var(--space-2); }
+.analysis-properties-header h2 { margin: 0; color: var(--text-main); font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; }
 
-.analysis-right::-webkit-scrollbar-thumb {
-  background: var(--border-light);
-  border-radius: 999px;
-}
-
-.analysis-properties-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-1) var(--space-1);
-}
-
-.analysis-properties-header h2 {
-  margin: var(--space-1) 0 0;
-  color: var(--text-main);
-  font-size: 1rem;
-  letter-spacing: -0.02em;
-}
-
-.analysis-properties-count,
 .panel-hint,
 .panel-kicker {
   color: var(--text-muted);
-  font: 600 0.65rem var(--font-mono);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.analysis-properties-count { white-space: nowrap; }
-
-.analysis-left .panel-header {
-  justify-content: space-between;
-}
-
-.analysis-left .panel-header > div {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.analysis-left .panel-title {
-  font-size: 0.9rem;
-  color: var(--text-main);
-  text-transform: none;
-}
-
-.analysis-left .pnet-graph {
-  height: clamp(540px, 64vh, 820px);
-  min-height: 540px;
+  font: 500 0.75rem var(--font-ui);
 }
 
 /* ── Matemática Grid (MatrixPanel + Invariants) ── */
@@ -314,18 +291,8 @@
 }
 
 @media (max-width: 1100px) {
-  .analysis-grid {
-    flex-direction: column;
-    min-height: 0;
-  }
-  .analysis-left {
-    width: 100%;
-  }
-  .analysis-right {
-    width: 100%;
-    max-height: none;
-    overflow: visible;
-  }
+  .analysis-grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  .analysis-right { position: static; max-height: none; overflow: visible; padding-right: 0; }
 
   .mat-grid {
     flex-direction: column;
@@ -432,3 +399,5 @@
 .header-home-icon { color: var(--text-muted); opacity: 0; margin-left: var(--space-1); transition: opacity var(--transition-fast); }
 .header-home:hover .header-home-icon, .header-home:focus-visible .header-home-icon { opacity: 1; }
 @media (hover: none) { .header-home-icon { opacity: 1; } }
+
+.content[hidden] { display: none; }

@@ -158,7 +158,8 @@ export default function MarkingPath({ filePath, blocked = false, extended = fals
   const closest = lastStep ? lastStep.marking.map((token, i) => `${nameOf(i)}: ${tokenValueToString(token)}`).join(', ') : null;
 
   return (
-    <div className="mp">
+    <div className="mp vf-split">
+    <div className="vf-in">
       <VectorField
         label={t('verify.marking.label')}
         help={t('verify.marking.help')}
@@ -191,7 +192,9 @@ export default function MarkingPath({ filePath, blocked = false, extended = fals
       <p className="mp-note">{graphBlocked ? t('verify.algebraic.onlyAlgebraic') : t('verify.algebraic.hint')}</p>
 
       {extended && <p className="mp-note">{t('verify.coverage.unsupported')}</p>}
-      {algebraic && <AlgebraicResult result={algebraic} t={t} />}
+          </div>
+    <div className="vf-out">
+{algebraic && <AlgebraicResult result={algebraic} t={t} />}
 
       {coverage && (
         <section className={`mp-result ${coverage.covered ? 'found' : 'missing'}`} aria-live="polite">
@@ -236,6 +239,7 @@ export default function MarkingPath({ filePath, blocked = false, extended = fals
           )}
         </section>
       )}
+    </div>
     </div>
   );
 }

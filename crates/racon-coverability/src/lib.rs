@@ -1,16 +1,20 @@
 pub mod boundedness;
+pub mod covproc;
 pub mod engine;
 pub mod error;
 pub mod graph;
 pub mod mincov;
+pub mod mp;
 
 pub use boundedness::{decide_boundedness, BoundednessVerdict};
 pub use engine::{
     CoverabilityConfig, CoverabilityEngine, CoverabilityEngineImpl, CoverabilityStrategy,
 };
+pub use covproc::{CovProc, CovProcConfig};
 pub use error::CoverabilityError;
 pub use graph::CoverabilityGraph;
 pub use mincov::{MinCov, MinCovConfig, MinimalCoverabilitySet, OmegaValue};
+pub use mp::{MonotonePruning, MonotonePruningConfig, WaitStrategy};
 
 #[cfg(test)]
 mod tests {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './Verification.css';
 import CTLEditor from './CTLEditor';
 import MarkingPath from './MarkingPath';
@@ -11,6 +11,8 @@ import BoundedGate from './BoundedGate';
 import { useI18n } from '../i18n/I18nContext';
 
 const MODES = ['ctl', 'marking', 'placeBound', 'deadTransition', 'distances', 'circuits', 'predicates'];
+// Stubborn-set decisions are proved only for plain P/T nets, so they are not offered otherwise.
+const PLAIN_ONLY = new Set(['placeBound', 'deadTransition']);
 
 /** Queries on the exact reachability graph: a CTL formula, or the way to reach a marking. */
 export default function Verification({ filePath, gate, ctlResult, onCtlResult, placeNames, transitionNames, extended = false }) {
@@ -19,6 +21,10 @@ export default function Verification({ filePath, gate, ctlResult, onCtlResult, p
   const [inject, setInject] = useState(null);
   const useInCtl = (text) => { setInject({ text, nonce: Date.now() }); setMode('ctl'); };
   const blocked = gate ? !gate.allowed : false;
+  const modes = MODES.filter((m) => !(extended && PLAIN_ONLY.has(m)));
+  useEffect(() => {
+    if (!modes.includes(mode)) setMode('ctl');
+  }, [modes, mode]);
 
   return (
     <div className="vf">
@@ -28,7 +34,7 @@ export default function Verification({ filePath, gate, ctlResult, onCtlResult, p
           <p>{t('verify.subtitle')}</p>
         </div>
         <div className="vf-switch" role="tablist" aria-label={t('verify.title')}>
-          {MODES.map((m) => (
+          {modes.map((m) => (
             <button
               key={m}
               type="button"
@@ -54,12 +60,16 @@ export default function Verification({ filePath, gate, ctlResult, onCtlResult, p
       <div role="tabpanel" id="vf-panel-marking" aria-labelledby="vf-tab-marking" hidden={mode !== 'marking'}>
         <MarkingPath filePath={filePath} blocked={blocked} extended={extended} />
       </div>
-      <div role="tabpanel" id="vf-panel-placeBound" aria-labelledby="vf-tab-placeBound" hidden={mode !== 'placeBound'}>
-        <PlaceBoundedness filePath={filePath} extended={extended} />
-      </div>
-      <div role="tabpanel" id="vf-panel-deadTransition" aria-labelledby="vf-tab-deadTransition" hidden={mode !== 'deadTransition'}>
-        <DeadTransition filePath={filePath} extended={extended} />
-      </div>
+      {!extended && (
+        <>
+          <div role="tabpanel" id="vf-panel-placeBound" aria-labelledby="vf-tab-placeBound" hidden={mode !== 'placeBound'}>
+            <PlaceBoundedness filePath={filePath} />
+          </div>
+          <div role="tabpanel" id="vf-panel-deadTransition" aria-labelledby="vf-tab-deadTransition" hidden={mode !== 'deadTransition'}>
+            <DeadTransition filePath={filePath} />
+          </div>
+        </>
+      )}
       <div role="tabpanel" id="vf-panel-distances" aria-labelledby="vf-tab-distances" hidden={mode !== 'distances'}>
         <Distances filePath={filePath} blocked={blocked} />
       </div>

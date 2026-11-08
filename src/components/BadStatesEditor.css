@@ -43,3 +43,8 @@
 .bs-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 .bs-secondary { border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-main); }
 .bs-secondary:hover { background: var(--bg-hover); }
+
+/* Header: the title stands alone; the kicker word was running into it. */
+.bs-editor .panel-kicker { display: none; }
+.bs-editor .panel-header { justify-content: space-between; }
+.bs-editor .panel-title { font-size: 0.9375rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text-main); }

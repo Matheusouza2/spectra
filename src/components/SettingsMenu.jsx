@@ -3,7 +3,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useI18n } from '../i18n/I18nContext';
 import './SettingsMenu.css';
 
-export default function SettingsMenu({ onOpenLogs }) {
+export default function SettingsMenu({ onOpenLogs, onOpenReferences }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
@@ -34,6 +34,11 @@ export default function SettingsMenu({ onOpenLogs }) {
   const openLogs = () => {
     close(false);
     onOpenLogs();
+  };
+
+  const openReferences = () => {
+    close(false);
+    onOpenReferences();
   };
 
   return (
@@ -93,6 +98,10 @@ export default function SettingsMenu({ onOpenLogs }) {
               ))}
             </div>
           </div>
+
+          <button type="button" className="settings-item" onClick={openReferences}>
+            {t('method.open')}
+          </button>
 
           <button type="button" className="settings-item" onClick={openLogs}>
             {t('common.viewLogs')}

@@ -104,13 +104,9 @@
   "info.selfLoops": "Self-loops",
   "info.none": "Nenhum",
   "behavior": {
-    "compute": "Calcular propriedades comportamentais",
-    "recompute": "Recalcular",
     "computing": "Calculando…",
     "done": "Calculado sobre o grafo de alcançabilidade completo.",
-    "blocked.loading": "Aguardando a verificação de limitação.",
-    "blocked.unbounded": "Indisponível: a rede é não limitada.",
-    "blocked.unknown": "Indisponível: a limitação não foi comprovada."
+    "waiting": "Abra a aba Graphs e gere o grafo de alcançabilidade para preencher as propriedades abaixo."
   },
   "scc.count": "Componentes fortemente conexos",
   "scc.desc": "Conjuntos máximos de estados que alcançam uns aos outros.",

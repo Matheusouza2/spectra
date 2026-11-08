@@ -112,7 +112,8 @@ export default function Circuits({ filePath, blocked = false }) {
   })();
 
   return (
-    <div className="cx">
+    <div className="cx vf-split">
+    <div className="vf-in">
       <fieldset className="cx-kinds">
         <legend>{t('verify.circuits.which')}</legend>
         {KINDS.map((k) => (
@@ -161,6 +162,8 @@ export default function Circuits({ filePath, blocked = false }) {
       </div>
       <p className="cx-note">{t('verify.circuits.budgetNote')}</p>
 
+    </div>
+    <div className="vf-out">
       {result && (
         <section className="cx-result" aria-live="polite">
           <p className="cx-summary">{summary}</p>
@@ -189,6 +192,7 @@ export default function Circuits({ filePath, blocked = false }) {
           )}
         </section>
       )}
+    </div>
     </div>
   );
 }

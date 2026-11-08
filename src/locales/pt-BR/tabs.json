@@ -4,5 +4,7 @@
   "invariants": "P/T Invariantes",
   "evidence": "Evidências",
   "tokens": "Token Game",
-  "verify": "Verificação"
+  "verify": "Verificação",
+  "advanced": "Métodos alternativos",
+  "needsGraph": "Gere o grafo na aba Graphs para liberar a verificação."
 }

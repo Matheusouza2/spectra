@@ -130,11 +130,21 @@ export const invoke = async (cmd, args) => {
         warning: null,
       };
 
+    case 'get_graph_cache_status':
+      return { reachability: true, coverability: true };
+
     case 'get_analysis_evidence':
       return mockEvidence;
 
     case 'check_place_boundedness':
       return { place: 'P1', bounded: true, visited: 1 };
+
+    case 'run_advanced_analysis':
+      return {
+        algorithm: args?.algorithm, name: args?.algorithm, reference_ids: [], experimental: true,
+        summary: { state_count: '3', diagram_nodes: 4, place_names: ['P1', 'P2', 'P3'], place_bounds: [1, 1, 1] },
+        when_not_to_use: '', does_not_preserve: [], elapsed_ms: 1,
+      };
 
     case 'check_transition_dead':
       return { transition: 'T1', dead: false, path: [], visited: 1 };

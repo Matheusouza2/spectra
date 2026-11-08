@@ -4,6 +4,7 @@ import LatexFormula from './LatexFormula';
 import { evidenceTitle } from './evidence-label';
 import { getAnalysisEvidence } from '../services/tauri-api';
 import { useI18n } from '../i18n/I18nContext';
+import { useToast } from './Toast';
 
 const GROUPS = [
   ['evidence.groups.properties', ['B', 'DST', 'DTR', 'REV', 'L', 'LS', 'DCF']],
@@ -25,8 +26,21 @@ function resultLabel(item, t) {
   return item.result === true ? t('evidence.yes') : item.result === false ? t('evidence.no') : '—';
 }
 
+// Plain-text form of a certificate, for pasting into a report or a message.
+function certificateText(evidence, title, tm) {
+  const proof = evidence.proof;
+  if (!proof) return title;
+  const lines = [`${title} — ${tm(evidence.definition?.name) || ''}`.trim(), '', tm(proof.conclusion)];
+  if (proof.assumptions?.length) lines.push('', ...proof.assumptions.map((a) => `• ${tm(a)}`));
+  if (proof.facts?.length) lines.push('', ...proof.facts.map((f) => `${tm(f.label)}: ${tm(f.value)}`));
+  if (proof.derivation?.length) lines.push('', ...proof.derivation.map((d, i) => `${i + 1}. ${tm(d.text)}`));
+  if (proof.completeness) lines.push('', tm(proof.completeness));
+  return lines.join('\n');
+}
+
 function EvidenceDetail({ evidence }) {
   const { t, tm } = useI18n();
+  const { addToast } = useToast();
   const [technicalOpen, setTechnicalOpen] = useState(false);
   const status = statusOf(evidence);
   const certificate = evidence.certificate || evidence.counterexample;
@@ -51,9 +65,16 @@ function EvidenceDetail({ evidence }) {
           <span className="ev-verdict-mark" aria-hidden="true">{STATUS_MARK[status]}</span>
           <span className="ev-verdict-result">{resultLabel(evidence, t)}</span>
         </div>
+        {proof?.conclusion && (
+          <p className="ev-guarantee">{tm(proof.conclusion)}</p>
+        )}
         <dl className="ev-detail-meta">
           <div><dt>{t('evidence.proofKindLabel')}</dt><dd>{proofKindKey ? t(proofKindKey) : status}</dd></div>
           <div><dt>{t('evidence.method')}</dt><dd>{method || '—'}</dd></div>
+          <div>
+            <dt>{t('evidence.scope')}</dt>
+            <dd>{evidence.metadata?.exact_state_space ? t('evidence.scopeExact') : t('evidence.scopeStructural')}</dd>
+          </div>
         </dl>
       </header>
 
@@ -64,29 +85,48 @@ function EvidenceDetail({ evidence }) {
       </section>
 
       <section className="ev-block">
-        <h3>{t('evidence.certificate')}</h3>
+        <div className="ev-block-head">
+          <h3>{t('evidence.certificate')}</h3>
+          {proof && (
+            <button
+              type="button"
+              className="ev-copy"
+              onClick={() => {
+                navigator.clipboard?.writeText(certificateText(evidence, evidenceTitle(evidence), tm))
+                  .then(() => addToast(t('evidence.copied'), 'success'))
+                  .catch(() => addToast(t('evidence.copyFailed'), 'error'));
+              }}
+            >
+              {t('evidence.copy')}
+            </button>
+          )}
+        </div>
         {proof ? (
           <div className="proof-certificate">
             {proof.assumptions?.length > 0 && (
-              <div className="proof-assumptions">
+              <div className="proof-stage">
                 <span className="proof-label">{t('evidence.assumptions')}</span>
-                {proof.assumptions.map((assumption) => <p key={assumption}>{tm(assumption)}</p>)}
+                <ul className="proof-assumptions">
+                  {proof.assumptions.map((assumption) => <li key={assumption}>{tm(assumption)}</li>)}
+                </ul>
               </div>
             )}
             {proof.facts?.length > 0 && (
-              <div className="proof-facts">
+              <div className="proof-stage">
                 <span className="proof-label">{t('evidence.verifiedData')}</span>
-                {proof.facts.map((fact) => (
-                  <div className="proof-fact" key={`${fact.label}-${fact.value}`}>
-                    <span>{tm(fact.label)}</span>
-                    {fact.formula_latex ? <LatexFormula value={fact.formula_latex} /> : <span />}
-                    <strong>{tm(fact.value)}</strong>
-                  </div>
-                ))}
+                <div className="proof-facts">
+                  {proof.facts.map((fact) => (
+                    <div className="proof-fact" key={`${fact.label}-${fact.value}`}>
+                      <span>{tm(fact.label)}</span>
+                      {fact.formula_latex ? <LatexFormula value={fact.formula_latex} /> : <span />}
+                      <strong>{tm(fact.value)}</strong>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             {proof.tables?.map((table) => (
-              <div className="proof-table-wrap" key={table.title}>
+              <div className="proof-stage proof-table-wrap" key={table.title}>
                 <span className="proof-label">{tm(table.title)}</span>
                 <div className="proof-table-scroll">
                   <table className="proof-table">
@@ -97,21 +137,24 @@ function EvidenceDetail({ evidence }) {
               </div>
             ))}
             {proof.derivation?.length > 0 && (
-              <ol className="proof-derivation">
+              <div className="proof-stage">
                 <span className="proof-label">{t('evidence.verification')}</span>
-                {proof.derivation.map((step, i) => (
-                  <li className="proof-step" key={step.text}>
-                    <span className="proof-step-n" aria-hidden="true">{i + 1}</span>
-                    <div><p>{tm(step.text)}</p>{step.formula_latex ? <LatexFormula value={step.formula_latex} /> : null}</div>
-                  </li>
-                ))}
-              </ol>
+                <ol className="proof-derivation">
+                  {proof.derivation.map((step, i) => (
+                    <li className="proof-step" key={`${i}-${step.text}`}>
+                      <span className="proof-step-n" aria-hidden="true">{i + 1}</span>
+                      <div><p>{tm(step.text)}</p>{step.formula_latex ? <LatexFormula value={step.formula_latex} /> : null}</div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             )}
-            <div className="proof-conclusion">
-              <span className="proof-label">∴ {t('evidence.conclusion')}</span>
-              <strong>{tm(proof.conclusion)}</strong>
-              <p>{tm(proof.completeness)}</p>
-            </div>
+            {proof.completeness && (
+              <div className="proof-stage proof-coverage">
+                <span className="proof-label">∴ {t('evidence.coverage')}</span>
+                <p>{tm(proof.completeness)}</p>
+              </div>
+            )}
           </div>
         ) : <p className="evidence-muted">{t('evidence.noCertificate')}</p>}
       </section>
@@ -147,7 +190,7 @@ function EvidenceDetail({ evidence }) {
 
       <footer className="ev-provenance">
         <h3>{t('evidence.provenance')}</h3>
-        <p>{tm(evidence.metadata?.algorithm)} · {t('evidence.exactSpace')}: {evidence.metadata?.exact_state_space ? t('common.yesLower') : t('common.noLower')}</p>
+        <p>{tm(evidence.metadata?.algorithm)}</p>
         {evidence.references?.length > 0 && (
           <ul>{evidence.references.map((reference) => <li key={`${reference.author}-${reference.title}`}>{reference.author} — <em>{reference.title}</em></li>)}</ul>
         )}
@@ -156,7 +199,7 @@ function EvidenceDetail({ evidence }) {
   );
 }
 
-export default function EvidenceViewer({ analysisData, filePath }) {
+export default function EvidenceViewer({ analysisData, filePath, graphKey = '', graphReady = true }) {
   const { t, tm } = useI18n();
   const [evidence, setEvidence] = useState(analysisData?.evidence || []);
   const [loading, setLoading] = useState(false);
@@ -176,7 +219,7 @@ export default function EvidenceViewer({ analysisData, filePath }) {
       .catch((reason) => { if (current) setError(String(reason)); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [filePath, analysisData]);
+  }, [filePath, analysisData, graphKey]);
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -198,6 +241,16 @@ export default function EvidenceViewer({ analysisData, filePath }) {
 
   const visible = grouped.flatMap((group) => group.items);
   const active = visible.find((item) => keyOf(item) === selected) || visible[0] || null;
+
+  const onIndexKey = (event) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    const rows = [...event.currentTarget.querySelectorAll('.ev-row')];
+    const at = rows.indexOf(document.activeElement);
+    const next = rows[Math.max(0, Math.min(rows.length - 1, at + (event.key === 'ArrowDown' ? 1 : -1)))];
+    next?.focus();
+    next?.click();
+  };
 
   const choose = (item) => {
     setSelected(keyOf(item));
@@ -235,6 +288,8 @@ export default function EvidenceViewer({ analysisData, filePath }) {
         )}
       </header>
 
+      {!graphReady && <p className="ev-pending" role="status">{t('evidence.needsGraph')}</p>}
+
       {loading ? (
         <p className="ev-empty" role="status">{t('evidence.computing')}</p>
       ) : error ? (
@@ -243,7 +298,7 @@ export default function EvidenceViewer({ analysisData, filePath }) {
         <p className="ev-empty">{t('evidence.none')}</p>
       ) : (
         <div className="ev-layout">
-          <nav className="ev-index" aria-label={t('evidence.title')}>
+          <nav className="ev-index" aria-label={t('evidence.title')} onKeyDown={onIndexKey}>
             {grouped.map((group) => (
               <section key={group.titleKey} className="ev-index-group">
                 <h2>{t(group.titleKey)}</h2>

@@ -2,6 +2,7 @@ import React from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import CTLTrace from './CTLTrace';
 import { prettyCtl } from '../services/ctl-format';
+import { tokenValueToString } from '../services/token-value';
 
 const CTLResult = ({ result, loading }) => {
   const { t } = useI18n();
@@ -38,6 +39,26 @@ const CTLResult = ({ result, loading }) => {
           <div className="ctl-coverage-fill" style={{ width: `${pct}%` }} />
         </div>
       </div>
+
+      {result.states?.length > 0 && (
+        <details className="ctl-states">
+          <summary>{t('ctl.statesList', { count: result.count })}</summary>
+          <ul>
+            {result.states.map((state) => {
+              const held = (state.marking || [])
+                .map((token, p) => ({ name: result.place_names?.[p] || `p${p}`, text: tokenValueToString(token) }))
+                .filter((cell) => cell.text !== '0');
+              return (
+                <li key={state.id}>
+                  <b>M{state.id}</b>
+                  <span>{held.length === 0 ? t('ctl.traceEmpty') : held.map((cell) => `${cell.name}=${cell.text}`).join('  ')}</span>
+                </li>
+              );
+            })}
+          </ul>
+          {result.states_truncated && <p className="ctl-states-note">{t('ctl.statesTruncated', { shown: result.states.length, count: result.count })}</p>}
+        </details>
+      )}
 
       {ev && (
         <div className="ctl-evidence">

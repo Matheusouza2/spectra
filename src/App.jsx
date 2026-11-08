@@ -13,6 +13,7 @@ import PropertyTable from './components/PropertyTable';
 import PetriNetGraph from './components/PetriNetGraph';
 import GraphTab from './components/GraphTab';
 import Verification from './components/Verification';
+import AdvancedMethods from './components/AdvancedMethods';
 import { queryGate } from './components/BoundedGate';
 import { deriveGraphProperties } from './services/graph-properties';
 import TokenGame from './components/TokenGame';
@@ -23,8 +24,9 @@ import AnalysisOverview from './components/AnalysisOverview';
 import InvariantOverview from './components/InvariantOverview';
 import EvidenceViewer from './components/EvidenceViewer';
 import DiagnosticsPanel from './components/DiagnosticsPanel';
+import MethodologyView from './components/MethodologyView';
 import { logEvent } from './services/app-logger';
-import { getNetStructure, getRequiredInitialProperties, parseMercuryText, analyzePnt, getInvariants, computeBehavioralProperties } from './services/tauri-api';
+import { getNetStructure, getRequiredInitialProperties, parseMercuryText, analyzePnt, getInvariants, computeBehavioralProperties, getGraphCacheStatus } from './services/tauri-api';
 import { loadGraphGenerationConfig } from './services/graph-config';
 
 const TABS = [
@@ -32,7 +34,8 @@ const TABS = [
   { id: 'graphs', labelKey: 'tabs.graphs' },
   { id: 'invariants', labelKey: 'tabs.invariants' },
   { id: 'evidence', labelKey: 'tabs.evidence' },
-  { id: 'verify', labelKey: 'tabs.verify' },
+  { id: 'verify', labelKey: 'tabs.verify', needsGraph: true },
+  { id: 'advanced', labelKey: 'tabs.advanced' },
   { id: 'tokens', labelKey: 'tabs.tokens' },
 ];
 
@@ -44,6 +47,8 @@ function AppContent() {
   const [requiredPropertiesLoading, setRequiredPropertiesLoading] = useState(false);
   const requiredPropertiesFileRef = useRef(null);
   const gate = queryGate(requiredProperties, requiredPropertiesLoading, Boolean(selectedFile));
+  const [referencesOpen, setReferencesOpen] = useState(false);
+  const closeReferences = useCallback(() => setReferencesOpen(false), []);
   const [activeTab, setActiveTab] = useState('analysis');
   const [visitedTabs, setVisitedTabs] = useState(new Set(['analysis']));
   const [ctlResult, setCtlResult] = useState(null);
@@ -90,19 +95,27 @@ function AppContent() {
       .finally(() => setNetStructureLoading(false));
   }, [selectedFile]);
 
+  // B / L / S need the saved graphs; the summary is computed again once they exist.
+  const [graphStatus, setGraphStatus] = useState({ reachability: false, coverability: false });
+  const graphReady = graphStatus.reachability || graphStatus.coverability;
+  const graphKey = `${graphStatus.reachability}-${graphStatus.coverability}`;
+
   useEffect(() => {
-    if (!selectedFile || !analysisResult || requiredPropertiesFileRef.current === selectedFile) return undefined;
+    if (!selectedFile || !analysisResult) return undefined;
     const filePath = selectedFile;
+    const runKey = `${filePath}|${graphKey}`;
+    if (requiredPropertiesFileRef.current === runKey) return undefined;
     let current = true;
-    requiredPropertiesFileRef.current = filePath;
-    setRequiredProperties(null);
+    const sameFile = requiredPropertiesFileRef.current?.startsWith(`${filePath}|`);
+    requiredPropertiesFileRef.current = runKey;
+    if (!sameFile) setRequiredProperties(null);
     setRequiredPropertiesLoading(true);
     getRequiredInitialProperties(filePath)
       .then((result) => { if (current) setRequiredProperties(result); })
       .catch((error) => { if (current) setRequiredProperties({ warning: String(error) }); })
       .finally(() => { if (current) setRequiredPropertiesLoading(false); });
     return () => { current = false; };
-  }, [selectedFile, analysisResult]);
+  }, [selectedFile, analysisResult, graphKey]);
 
   const handleFileSelect = (file) => {
     if (file !== selectedFile) {
@@ -116,12 +129,34 @@ function AppContent() {
       setInvariantInfo(null);
       setGraphProps(null);
       setBehavior(null);
+      setGraphStatus({ reachability: false, coverability: false });
       setActiveTab('analysis');
       setVisitedTabs(new Set(['analysis']));
     }
     setSelectedFile(file);
     logEvent('INFO', 'frontend', 'file.selected', `Arquivo selecionado: ${file?.split('/').pop() ?? 'desconhecido'}`);
   };
+
+  // Behavioural properties (liveness, SCCs, conflicts…) need the complete reachability graph,
+  // so they are filled in automatically once the Graphs tab has produced one.
+  const behaviorRunRef = useRef(false);
+  const selectedFileRef = useRef(selectedFile);
+  selectedFileRef.current = selectedFile;
+  const computeBehavior = useCallback(async (file) => {
+    if (!file || behaviorRunRef.current) return;
+    behaviorRunRef.current = true;
+    setBehaviorLoading(true);
+    try {
+      const result = await computeBehavioralProperties(file, loadGraphGenerationConfig());
+      if (selectedFileRef.current === file) setBehavior(result);
+    } catch (err) {
+      logEvent('ERROR', 'frontend', 'behavior.failed', String(err));
+      addToast(t('common.errorWith', { error: tm(err) }), 'error');
+    } finally {
+      behaviorRunRef.current = false;
+      setBehaviorLoading(false);
+    }
+  }, [addToast, t, tm]);
 
   const handleGraphProperties = useCallback((graph) => {
     const transitionIds = (netStructure?.transitions || []).map((tr) => tr.id);
@@ -138,17 +173,26 @@ function AppContent() {
     });
   }, [netStructure]);
 
-  const handleComputeBehavior = useCallback(async () => {
-    if (!selectedFile || behaviorLoading) return;
-    setBehaviorLoading(true);
+  // Which graphs are saved for this net (they survive restarts); asked again after each generation.
+  const refreshGraphStatus = useCallback(async (file) => {
+    if (!file) return;
     try {
-      setBehavior(await computeBehavioralProperties(selectedFile, loadGraphGenerationConfig()));
-    } catch (err) {
-      addToast(t('common.errorWith', { error: tm(err) }), 'error');
-    } finally {
-      setBehaviorLoading(false);
+      const status = await getGraphCacheStatus(file);
+      if (selectedFileRef.current === file) setGraphStatus(status);
+    } catch (error) {
+      logEvent('ERROR', 'frontend', 'graph.status.failed', `Estado do cache de grafos indisponível: ${String(error)}`);
     }
-  }, [selectedFile, behaviorLoading, addToast, t, tm]);
+  }, []);
+
+  useEffect(() => {
+    setGraphStatus({ reachability: false, coverability: false });
+    refreshGraphStatus(selectedFile);
+  }, [selectedFile, refreshGraphStatus]);
+
+  // The behavioural properties are read from the saved reachability graph as soon as it exists.
+  useEffect(() => {
+    if (selectedFile && graphStatus.reachability) computeBehavior(selectedFile);
+  }, [selectedFile, graphStatus.reachability, computeBehavior]);
 
   // CPI / CTI come from the invariants, which the first analysis does not compute.
   useEffect(() => {
@@ -290,6 +334,8 @@ function AppContent() {
                 aria-selected={activeTab === tab.id}
                 className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
                 onClick={() => handleTabClick(tab.id)}
+                disabled={tab.needsGraph && !graphReady}
+                title={tab.needsGraph && !graphReady ? t('tabs.needsGraph') : undefined}
               >
                 {t(tab.labelKey)}
               </button>
@@ -307,13 +353,19 @@ function AppContent() {
           </div>
         )}
         <div className="header-end">
-          <SettingsMenu onOpenLogs={() => setDiagnosticsOpen(true)} />
+          <SettingsMenu onOpenLogs={() => setDiagnosticsOpen(true)} onOpenReferences={() => setReferencesOpen(true)} />
         </div>
       </header>
 
+      {referencesOpen && (
+        <main className="content content-references">
+          <ErrorBoundary><MethodologyView onClose={closeReferences} /></ErrorBoundary>
+        </main>
+      )}
+
       {analysisResult && (
         <>
-          <main className="content">
+          <main className="content" hidden={referencesOpen}>
             {visitedTabs.has('analysis') && (
               <div role="tabpanel" hidden={activeTab !== 'analysis'}>
                 <ErrorBoundary>
@@ -348,7 +400,7 @@ function AppContent() {
                           requiredPropertiesLoading={requiredPropertiesLoading}
                           badStates={badStates}
                           placeNames={netStructure?.places?.map((p) => p.name)}
-                          behavioral={{ computed: Boolean(behavior), loading: behaviorLoading, onCompute: handleComputeBehavior, gate }}
+                          behavioral={{ computed: Boolean(behavior), loading: behaviorLoading }}
                         />
                       </aside>
                     </div>
@@ -371,6 +423,7 @@ function AppContent() {
                     analysisData={analysisResult}
                     bounded={requiredProperties?.bounded ?? analysisResult?.bounded ?? null}
                     onGraphProperties={handleGraphProperties}
+                    onGraphGenerated={() => refreshGraphStatus(selectedFile)}
                     transitionNames={transitionNames}
                     extended={Boolean(netStructure?.extended)}
                   />
@@ -401,7 +454,7 @@ function AppContent() {
               </div>
             )}
 
-            {visitedTabs.has('verify') && (
+            {visitedTabs.has('verify') && graphReady && (
               <div role="tabpanel" hidden={activeTab !== 'verify'}>
                 <ErrorBoundary>
                   <Verification
@@ -417,10 +470,22 @@ function AppContent() {
               </div>
             )}
 
+            {visitedTabs.has('advanced') && (
+              <div role="tabpanel" hidden={activeTab !== 'advanced'}>
+                <ErrorBoundary>
+                  <AdvancedMethods
+                    filePath={selectedFile}
+                    extended={Boolean(netStructure?.extended)}
+                    placeNames={netStructure?.places?.map((p) => p.name)}
+                  />
+                </ErrorBoundary>
+              </div>
+            )}
+
             {visitedTabs.has('evidence') && (
               <div role="tabpanel" hidden={activeTab !== 'evidence'}>
                 <ErrorBoundary>
-                  <EvidenceViewer analysisData={analysisResult} filePath={selectedFile} />
+                  <EvidenceViewer analysisData={analysisResult} filePath={selectedFile} graphKey={graphKey} graphReady={graphReady} />
                 </ErrorBoundary>
               </div>
             )}
@@ -439,7 +504,7 @@ function AppContent() {
       {diagnosticsOpen && <DiagnosticsPanel onClose={() => setDiagnosticsOpen(false)} />}
 
       {!analysisResult && (
-        <main className="content welcome">
+        <main className="content welcome" hidden={referencesOpen}>
           <section className="welcome-intro">
             <div className="welcome-brand">
               <Logo size={48} />

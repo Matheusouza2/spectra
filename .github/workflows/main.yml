@@ -1,8 +1,8 @@
-name: Build desktop apps and publish website
+name: Build and release desktop apps
 
 on:
   push:
-    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -99,11 +99,22 @@ jobs:
   publish-release:
     name: Publish installers
     needs: desktop-build
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Ensure tag matches app version
+        run: |
+          app_version=$(grep -m1 '"version"' src-tauri/tauri.conf.json | sed -E 's/.*"([^"]+)",?/\1/')
+          if [ "v$app_version" != "${{ github.ref_name }}" ]; then
+            echo "Tag ${{ github.ref_name }} does not match src-tauri/tauri.conf.json version v$app_version" >&2
+            exit 1
+          fi
+
       - name: Download platform bundles
         uses: actions/download-artifact@v4
         with:
@@ -111,37 +122,11 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Publish this main build as a GitHub Release
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: main-${{ github.sha }}
-          name: RACoN main build ${{ github.sha }}
+          tag_name: ${{ github.ref_name }}
+          name: RACoN ${{ github.ref_name }}
           make_latest: true
           generate_release_notes: true
           files: release-assets/**
-
-  deploy-pages:
-    name: Deploy GitHub Pages
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload website files
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: website
-
-      - name: Deploy website
-        id: deployment
-        uses: actions/deploy-pages@v4

@@ -1,0 +1,76 @@
+{
+  "selectFile": "Selecione um arquivo para usar os métodos avançados.",
+  "hint": "Métodos com resultado próprio: espaços de estados simbólicos, unfolding e reduções. Os conjuntos de cobertura (GRVB e Monotone-Pruning) ficam na aba Grafos. São experimentais e cada um declara o que não preserva.",
+  "method": "Método",
+  "limit": "Limite de nós/eventos",
+  "limitDefault": "padrão",
+  "order": "Ordem adequada",
+  "goal": "Objetivo",
+  "goalDeadlock": "Deadlock",
+  "goalSafety": "Segurança (suporte)",
+  "support": "Lugares do suporte",
+  "run": "Executar",
+  "running": "Executando…",
+  "elapsed": "Tempo: {ms} ms",
+  "doesNotPreserve": "Não preserva",
+  "methods": {
+    "symbolic_mdd": {
+      "name": "MDD + Saturation",
+      "when": "Redes P/T limitadas com vários tokens por lugar: conta estados e limites exatos sem enumerá-los. Não gera o grafo de transições nem serve para CTL."
+    },
+    "symbolic_bdd": {
+      "name": "BDD (Bryant 1986)",
+      "when": "Só redes 1-safe (pesos 1, no máximo um token por lugar); recusa a rede se um disparo violar isso."
+    },
+    "unfolding_prefix": {
+      "name": "Prefixo de unfolding (ERV)",
+      "when": "Redes 1-limitadas com muita concorrência: marcações alcançáveis, transições mortas e deadlock."
+    },
+    "structural_rules": {
+      "name": "Reduções estruturais (Thierry-Mieg)",
+      "when": "A rede reduzida é outra rede: só preserva deadlock ou segurança sobre o suporte escolhido."
+    },
+    "polyhedral_abstraction": {
+      "name": "Abstração poliédrica",
+      "when": "Reduz a rede a (N, E, N′) com equações lineares entre os lugares. A verificação por SMT não está incluída."
+    }
+  },
+  "fields": {
+    "state_count": "Estados alcançáveis",
+    "diagram_nodes": "Nós do diagrama",
+    "allocated_nodes": "Nós alocados",
+    "place_bounds": "Limite por lugar",
+    "place_names": "Lugares",
+    "states": "Marcações listadas",
+    "states_listed": "Lista completa",
+    "encoding": "Codificação",
+    "iterations": "Iterações",
+    "events": "Eventos",
+    "conditions": "Condições",
+    "cutoff_events": "Eventos cut-off",
+    "dead_transitions": "Transições mortas",
+    "reachable_markings": "Marcações alcançáveis",
+    "has_deadlock": "Possui deadlock",
+    "deadlock_marking": "Marcação de deadlock",
+    "order": "Ordem adequada",
+    "goal": "Objetivo",
+    "original_places": "Lugares originais",
+    "original_transitions": "Transições originais",
+    "remaining_places": "Lugares restantes",
+    "remaining_transitions": "Transições restantes",
+    "initial_marking": "Marcação inicial reduzida",
+    "empty_net": "Rede vazia",
+    "deadlock_free": "Livre de deadlock",
+    "total_applications": "Aplicações de regras",
+    "applications_per_rule": "Aplicações por regra",
+    "agglomerations": "Aglomerações",
+    "rounds": "Rodadas",
+    "equations": "Equações E",
+    "bounded": "Limitada",
+    "unbounded_places": "Lugares não limitados",
+    "elements": "Elementos maximais",
+    "tree_vertices": "Vértices da árvore",
+    "accelerations": "Acelerações"
+  },
+  "extendedBlocked": "Esta rede tem arcos inibidores ou transições imediatas, e estes métodos só aceitam redes lugar/transição simples. Remova esses elementos para executar."
+}

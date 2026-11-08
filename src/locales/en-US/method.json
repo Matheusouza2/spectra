@@ -1,0 +1,205 @@
+{
+  "open": "References and methods",
+  "title": "References and methods",
+  "lead": "Every computation SPECTRA performs, with its definition, how it is computed, what the result guarantees and where it stops being valid. Each item names the Rust crate behind it, so a result can be traced to code and to a source.",
+  "back": "Back to analysis",
+  "search": "Filter methods",
+  "searchPlaceholder": "Filter by name, formula or crate",
+  "noMatch": "No method matches “{query}”.",
+  "contents": "Contents",
+  "what": "What it answers",
+  "how": "How it is computed",
+  "limits": "Guarantees and limits",
+  "formulas": "Formulas",
+  "implementation": "Implementation",
+  "sources": "Sources",
+  "noSource": "No external source: elementary definition applied directly.",
+  "live.title": "Algorithm catalog",
+  "live.intro": "Read from the running engine, so it always matches the installed version. Version: {version}.",
+  "live.loading": "Loading catalog…",
+  "live.error": "Catalog unavailable: {error}",
+  "live.status": "Status",
+  "live.role": "Role",
+  "live.role.exploration": "Exploration",
+  "live.role.reduction": "Reduction",
+  "live.objectives": "Objectives",
+  "live.netClasses": "Net classes",
+  "live.version": "Implemented version",
+  "live.notImplemented": "not implemented",
+  "live.proof": "Proof or test mapping",
+  "live.none": "none recorded",
+  "live.preserves": "Preserves",
+  "live.doesNotPreserve": "Does not preserve",
+  "live.when": "When to use",
+  "live.whenNot": "When not to use",
+  "live.output": "Produces",
+  "bib.title": "Bibliography",
+  "bib.intro": "Sources cited above. Access notes say how much of each source was actually consulted.",
+  "bib.access": "Access",
+  "bib.classic": "Classic references",
+  "sections": {
+    "model": {
+      "title": "Model and firing rule",
+      "intro": "The definitions every other computation builds on.",
+      "items": {
+        "firing": {
+          "name": "Firing rule",
+          "what": "Whether a transition can fire in a marking and which marking results.",
+          "how": "A transition is enabled when every input place holds at least the arc weight. Firing removes the input weights and adds the output weights. Arcs absent from the net have weight 0.",
+          "limits": "Exact integer arithmetic. Nets with inhibitor arcs or immediate transitions use the extended rule, and several algorithms below are blocked for them."
+        },
+        "state-equation": {
+          "name": "Incidence matrix and state equation",
+          "what": "The net effect of firing sequences on markings, without simulating them.",
+          "how": "C is Post minus Pre. Any firing sequence with Parikh vector x leads from m₀ to m₀ + C·x.",
+          "limits": "A necessary condition for reachability, not a sufficient one: a solution of the equation does not prove the marking is reachable."
+        }
+      }
+    },
+    "structural": {
+      "title": "Structural analysis",
+      "intro": "Properties read from the arcs alone, with no state space.",
+      "items": {
+        "classes": {
+          "name": "Net classes and topology",
+          "what": "Whether the net is ordinary, pure, a state machine, a marked graph, free-choice, extended free-choice and similar.",
+          "how": "Each class is a check over the presets and postsets of places and transitions, run directly on the arc lists.",
+          "limits": "Purely structural and exact. A net outside a class says nothing about its behavior."
+        },
+        "siphons-traps": {
+          "name": "Siphons and traps",
+          "what": "Place sets that cannot regain tokens once empty (siphons) or never lose all tokens once marked (traps).",
+          "how": "Checked against the preset and postset of every transition, as in the formulas.",
+          "limits": "Used as structural evidence for deadlock and liveness conditions, together with the rules in the behavioral properties."
+        }
+      }
+    },
+    "invariants": {
+      "title": "Invariants",
+      "intro": "Linear conservation laws and repetitive behaviors found with linear algebra.",
+      "items": {
+        "p-invariants": {
+          "name": "P-invariants",
+          "what": "Weighted token counts that never change.",
+          "how": "Solves yᵀC = 0 over the integers with arbitrary-precision arithmetic, then reports the vectors with minimal support. Each kernel vector is verified before it is reported.",
+          "limits": "Exact, with no floating point. Very large matrices are refused with an error instead of an approximate answer."
+        },
+        "t-invariants": {
+          "name": "T-invariants",
+          "what": "Firing counts that return the net to the same marking.",
+          "how": "Solves Cx = 0 with x ≥ 0 using the same exact engine as P-invariants.",
+          "limits": "A T-invariant is algebraic. It does not prove the sequence can actually fire from m₀."
+        },
+        "coverage": {
+          "name": "Coverage and derived properties",
+          "what": "Whether positive invariants cover all places or transitions, and what follows.",
+          "how": "CPI, CTI, conservativeness and structural boundedness are derived from the invariant set. Structural boundedness uses Farkas’ lemma, as in Murata.",
+          "limits": "Covering all places by non-negative P-invariants proves boundedness. The converse is not claimed."
+        }
+      }
+    },
+    "statespace": {
+      "title": "State space",
+      "intro": "The graphs SPECTRA builds from the initial marking.",
+      "items": {
+        "reachability": {
+          "name": "Reachability graph",
+          "what": "Every marking reachable from m₀ and which transition connects them.",
+          "how": "Breadth-first or depth-first exploration from m₀, adding a node for each new marking. Breadth-first search follows Cormen et al. §20.2: a FIFO queue, each marking discovered once, and the depth of a node equal to the minimum number of firings from m₀ (Theorem 20.5). Depth-first search follows DFS-VISIT of §20.3 with an explicit stack: a node is discovered on first access and finished when its enabled transitions run out. Both cost O(V + E) on the graph they generate.",
+          "limits": "Exact only when it finishes. Limits on states, edges and memory stop it, and a stopped graph is reported as truncated, never as a verdict. Needs a bounded net to terminate."
+        },
+        "coverability": {
+          "name": "Coverability tree (Karp–Miller, Finkel)",
+          "what": "Boundedness and which places can grow without limit, even when the net is unbounded.",
+          "how": "Explores like the reachability graph, but when a marking strictly dominates one of its ancestors the growing places become ω, which stands for arbitrarily many tokens.",
+          "limits": "Always terminates on place/transition nets. It over-approximates reachability, so it cannot prove exact reachability. Requires monotonicity, so nets with inhibitor arcs or immediate transitions are refused."
+        },
+        "mincov": {
+          "name": "MinCov (minimal coverability set)",
+          "what": "The smallest set of ω-markings that covers every reachable marking.",
+          "how": "Algorithm 1 of Finkel–Haddad–Khmelnitsky 2020, with each step mapped to the Rust function that implements it in the source of the algorithm.",
+          "limits": "Marked experimental. Checked against Karp–Miller on random nets, which is evidence and not a proof."
+        }
+      }
+    },
+    "behavioural": {
+      "title": "Behavioral properties",
+      "intro": "Properties of the system’s runs, derived from the state space.",
+      "items": {
+        "boundedness": {
+          "name": "Boundedness",
+          "what": "Whether any place can hold unboundedly many tokens, and the bound per place.",
+          "how": "Unbounded if an ω appears in the coverability tree. For bounded nets the bound is the maximum over the reachability graph.",
+          "limits": "Decided by the coverability tree, so it holds even when the reachability graph cannot be built."
+        },
+        "deadlock-liveness": {
+          "name": "Deadlocks, dead transitions and liveness",
+          "what": "Reachable markings with no enabled transition, transitions that never fire, and transitions that can always fire again.",
+          "how": "Deadlocks and dead transitions come from the reachability graph. Liveness uses strongly connected components found with Tarjan’s algorithm.",
+          "limits": "Needs the complete, unreduced reachability graph. If the graph was truncated or reduced the result is reported as inconclusive."
+        },
+        "reversibility": {
+          "name": "Reversibility and home states",
+          "what": "Whether the net can always return to its initial marking.",
+          "how": "The initial marking is a home state exactly when every reachable marking can reach it, which in a finite graph means the graph is one strongly connected component.",
+          "limits": "Same condition as liveness: it needs the complete graph."
+        }
+      }
+    },
+    "verification": {
+      "title": "Verification and evidence",
+      "intro": "Answering a question about the net and showing why the answer holds.",
+      "items": {
+        "ctl": {
+          "name": "CTL model checking",
+          "what": "Whether a temporal formula holds in the initial marking, with a witness or counterexample.",
+          "how": "Formulas are written in the Portuguese-based DSL, parsed, and evaluated over the reachability graph. EF, EU and AF use least fixed points. EG uses a greatest fixed point over strongly connected components.",
+          "limits": "Evaluated on the finite graph, so it needs a complete, unreduced graph. Stubborn-set graphs are not valid input for CTL."
+        },
+        "marking-test": {
+          "name": "Marking test (unreachability)",
+          "what": "A proof that a marking cannot be reached, without exploring the state space.",
+          "how": "Tries to solve C·x = m* − m₀ over the naturals. When there is no solution it returns a Farkas vector that is verified exactly.",
+          "limits": "Can prove unreachability. When the equation has a solution the answer is inconclusive, not “reachable”."
+        },
+        "bad-states": {
+          "name": "Bad states",
+          "what": "Whether the net can reach a marking that violates a safety condition you define.",
+          "how": "Searches the state space for a marking satisfying the formula and returns the shortest firing sequence as a witness.",
+          "limits": "A negative answer is only a proof when the search covered the whole state space. Otherwise it is reported as inconclusive."
+        },
+        "evidence": {
+          "name": "Evidence records",
+          "what": "For each reported property: its definition, the method, the status and the certificate.",
+          "how": "Each result is tagged as proof, counterproof, algebraic certificate or inconclusive, with the mathematical definition and the method reference attached.",
+          "limits": "Evidence states what was shown and by which method. It does not strengthen a result beyond what the method guarantees."
+        }
+      }
+    },
+    "reductions": {
+      "title": "Reductions",
+      "intro": "Ways to explore fewer states. Each one preserves only some properties.",
+      "items": {
+        "stubborn": {
+          "name": "Stubborn sets",
+          "what": "Deadlock reachability with far fewer states.",
+          "how": "At each marking only the enabled transitions of a stubborn set are explored. The set is closed under conflict and under the enablers of its disabled members.",
+          "limits": "Preserves deadlock reachability. No ignoring proviso is implemented, so do not read liveness, dead transitions, reversibility or CTL from such a graph."
+        },
+        "symmetry": {
+          "name": "Symmetry reduction",
+          "what": "Whether a marking is reachable, whether a deadlock exists and whether the net is bounded, on a graph with one marking per class of equivalent markings.",
+          "how": "The automorphism group of the net (Def. 3.2) is found by individualization and refinement, and every generator is checked against the net. Each successor marking is replaced by the smallest marking of its orbit, found by backtracking in the Schreier–Sims representation (Alg. 4.2), so equivalent markings share one node.",
+          "limits": "Preserves deadlock existence and boundedness of the net (Cor. 2.12), reachability up to equivalence when the group fixes the initial marking (Cor. 2.13, the default), and CTL* with symmetry-invariant propositions only. It does not preserve the bound of one place, a specific dead transition, state counts or shortest paths. If the search for generators hits its limit, a subgroup is used: still correct, possibly larger. Plain place/transition nets only, and not combined with stubborn sets."
+        },
+        "structural-rules": {
+          "name": "Structural reductions (rules A–I)",
+          "what": "Whether a marking satisfying a formula is reachable, on a smaller net rewritten for that formula.",
+          "how": "Rules A–I of Bønneland et al. (2019) rewrite the weighted net, including inhibitor arcs, depending on the places the formula mentions. The reduced net is then searched.",
+          "limits": "The reduced net answers only the formula it was built for, and must not be used to draw the graph. Rules G and I do not preserve deadlock reachability and are off for deadlock queries. Nets with immediate transitions are rejected. Rule C checks its condition for every transition, which is stricter than the paper."
+        }
+      }
+    }
+  },
+  "live.notes": "Notes"
+}

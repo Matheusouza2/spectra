@@ -4,18 +4,23 @@
 //! stubborn sets and Finkel minimal coverability. Every reduction declares its
 //! preconditions and the properties it preserves before it is applied.
 
+pub mod bdd;
 pub mod bounded_search;
 pub mod capability;
 pub mod catalog;
 pub mod dead_transitions;
+pub mod decision_diagrams;
 pub mod error;
 pub mod explorer;
 pub mod goal_search;
 pub mod planner;
+pub mod polyhedral;
 pub mod query_rules;
 pub mod rules;
 pub mod stubborn;
 pub mod symmetry;
+pub mod thierry_mieg;
+pub mod unfolding;
 pub mod variant;
 
 pub use bounded_search::{
@@ -43,6 +48,10 @@ pub use stubborn::stubborn_set;
 pub use symmetry::{
     compute_symmetries, transposition_generator_pairs, Symmetry, SymmetryGenerator,
     SymmetryGeneratorKind, SymmetryOptions, SymmetryReport,
+};
+pub use thierry_mieg::{
+    reduce as reduce_thierry_mieg, Agglomeration, ReductionGoal, ThierryMiegConfig,
+    ThierryMiegResult,
 };
 pub use variant::VariantId;
 

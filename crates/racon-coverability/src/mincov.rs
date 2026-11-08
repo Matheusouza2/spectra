@@ -32,7 +32,7 @@ pub enum OmegaValue {
 
 impl OmegaValue {
     /// `self ≥ other` in the order of `N_ω` (`ω > n` for every `n ∈ N`).
-    fn geq(self, other: Self) -> bool {
+    pub(crate) fn geq(self, other: Self) -> bool {
         match (self, other) {
             (Self::Omega, _) => true,
             (Self::Finite(_), Self::Omega) => false,
@@ -43,7 +43,7 @@ impl OmegaValue {
 
 type OmegaMarking = Vec<OmegaValue>;
 
-fn marking_ge(a: &[OmegaValue], b: &[OmegaValue]) -> bool {
+pub(crate) fn marking_ge(a: &[OmegaValue], b: &[OmegaValue]) -> bool {
     a.iter().zip(b).all(|(x, y)| x.geq(*y))
 }
 
@@ -173,6 +173,15 @@ pub struct MinimalCoverabilitySet {
 }
 
 impl MinimalCoverabilitySet {
+    pub(crate) fn from_parts(
+        elements: Vec<Vec<OmegaValue>>,
+        tree_vertices: usize,
+        accelerations: usize,
+        iterations: usize,
+    ) -> Self {
+        Self { elements, tree_vertices, accelerations, iterations }
+    }
+
     /// The ω-markings, sorted for deterministic output.
     pub fn elements(&self) -> &[Vec<OmegaValue>] {
         &self.elements

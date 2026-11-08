@@ -451,3 +451,40 @@ async fn transition_dead_reports_status_witness_and_unknown_transitions() {
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(missing["error"]["code"], "TRANSITION_NOT_FOUND");
 }
+
+#[tokio::test]
+async fn advanced_algorithms_run_through_the_session_route() {
+    let model = cycle_model();
+    let app = test_router(None);
+    let load = load_model(&app, &model).await;
+    let session = load["session_id"].as_str().unwrap();
+    let run = |algorithm: &str, body: Value| {
+        request(Method::POST, &format!("/v1/sessions/{session}/algorithms/{algorithm}"), body, None)
+    };
+
+    for algorithm in ["symbolic_mdd", "symbolic_bdd"] {
+        let (status, body) = json_response(&app, run(algorithm, json!({}))).await;
+        assert_eq!(status, StatusCode::OK, "{algorithm}: {body}");
+        assert_eq!(body["summary"]["state_count"], "2", "{algorithm}");
+    }
+    let (status, body) = json_response(&app, run("unfolding_prefix", json!({ "order": "mcmillan" }))).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["summary"]["has_deadlock"], false);
+    let (status, body) = json_response(&app, run("coverability_grvb", json!({}))).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["summary"]["bounded"], true);
+    let (status, body) = json_response(&app, run("coverability_mp", json!({}))).await;
+    assert_eq!((status, body["summary"]["bounded"].clone()), (StatusCode::OK, json!(true)));
+    for algorithm in ["structural_rules", "polyhedral_abstraction"] {
+        let (status, body) = json_response(&app, run(algorithm, json!({}))).await;
+        assert_eq!(status, StatusCode::OK, "{algorithm}: {body}");
+    }
+
+    let (status, body) = json_response(&app, run("symbolic_bdd", json!({ "limit": 2 }))).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body["error"]["code"], "RESOURCE_LIMIT_EXCEEDED");
+    let (status, body) = json_response(&app, run("structural_rules", json!({ "goal": "safety" }))).await;
+    assert_eq!((status, body["error"]["code"].clone()), (StatusCode::BAD_REQUEST, json!("BAD_REQUEST")));
+    let (status, body) = json_response(&app, run("nope", json!({}))).await;
+    assert_eq!((status, body["error"]["code"].clone()), (StatusCode::NOT_FOUND, json!("UNKNOWN_ALGORITHM")));
+}

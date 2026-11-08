@@ -296,3 +296,14 @@ kbd {
 .ctl-ref-note { margin: calc(var(--space-2) * -1) 0 var(--space-3); font-size: 0.8125rem; line-height: 1.5; color: var(--text-secondary); }
 
 .ctl-trace-graph.circuit .ctl-trace-node.end { border-color: var(--accent); border-style: dashed; }
+
+/* Every state where the formula holds, not just the one path of the witness. */
+.ctl-states { padding-top: var(--space-3); border-top: 1px solid var(--border-light); }
+.ctl-states > summary { cursor: pointer; width: fit-content; font-size: 0.875rem; font-weight: 600; color: var(--accent); }
+.ctl-states > summary:hover { text-decoration: underline; }
+.ctl-states ul { list-style: none; max-height: 320px; overflow: auto; margin-top: var(--space-2); border: 1px solid var(--border-light); border-radius: var(--radius-sm); }
+.ctl-states li { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--space-3); padding: 4px var(--space-3); border-bottom: 1px solid var(--border-light); font-size: 0.8125rem; }
+.ctl-states li:last-child { border-bottom: 0; }
+.ctl-states li b { font-family: var(--font-mono); font-weight: 600; color: var(--text-main); }
+.ctl-states li span { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); overflow-wrap: anywhere; white-space: pre-wrap; }
+.ctl-states-note { margin-top: var(--space-2); font-size: 0.75rem; color: var(--text-muted); }

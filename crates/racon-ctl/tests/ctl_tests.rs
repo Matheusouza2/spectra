@@ -442,8 +442,9 @@ fn terminal_states_use_logical_self_loop_for_ctl() {
             .unwrap()
             .satisfied
     );
+    // Paper semantics (Table 1): AX is vacuously true at a deadlock.
     assert!(
-        !engine
+        engine
             .evaluate(&CTLFormula::AX(Box::new(predicate)), &state_space, &context)
             .unwrap()
             .satisfied

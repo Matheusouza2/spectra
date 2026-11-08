@@ -10,13 +10,14 @@ import { getDeadlockTrapProperty, getStructuralProperties } from '../services/ta
 const PhaseContext = createContext('computed');
 
 const SectionCard = ({ title, icon, open = true, children }) => (
-  <div className="prop-card">
-    <div className="prop-card-header">
-      <span className="prop-card-icon">{icon}</span>
+  <details className="prop-card" open={open}>
+    <summary className="prop-card-header">
+      <span className="prop-card-icon" aria-hidden="true">{icon}</span>
       <span className="prop-card-title">{title}</span>
-    </div>
+      <span className="prop-chevron" aria-hidden="true">▾</span>
+    </summary>
     <div className="prop-card-body">{children}</div>
-  </div>
+  </details>
 );
 
 const PropRow = ({ code, label, value, desc, phase }) => {
@@ -184,19 +185,10 @@ const PropertyTable = ({ data, filePath, requiredProperties, requiredPropertiesL
     <div className="props">
       {/* ── Behavioral Properties ── */}
       <SectionCard title={t('props.sections.behavioral')} icon="◇">
-        {data.analysis_status === 'structural_analysis_complete' && !behavioral?.computed && (
-          <p className="props-analysis-pending">{t('props.pendingRequired')}</p>
-        )}
         {behavioral && (
-          <div className="props-behavior-action">
-            <button type="button" className="deadlock-trap-button" onClick={behavioral.onCompute} disabled={behavioral.loading || !behavioral.gate?.allowed}>
-              {behavioral.loading ? t('props.behavior.computing') : behavioral.computed ? t('props.behavior.recompute') : t('props.behavior.compute')}
-            </button>
-            {!behavioral.gate?.allowed && behavioral.gate?.reason && behavioral.gate.reason !== 'noFile' && (
-              <span className="props-behavior-hint">{t(`props.behavior.blocked.${behavioral.gate.reason}`)}</span>
-            )}
-            {behavioral.computed && <span className="props-behavior-hint">{t('props.behavior.done')}</span>}
-          </div>
+          <p className="props-analysis-pending" role="status">
+            {behavioral.loading ? t('props.behavior.computing') : behavioral.computed ? t('props.behavior.done') : t('props.behavior.waiting')}
+          </p>
         )}
         {requiredPropertiesLoading && <p className="props-analysis-pending">{t('props.pendingBLS')}</p>}
         <PropRow code="B" label={t('props.rows.B.label')} value={requiredProperties?.bounded ?? data.bounded} phase={requiredPropertiesLoading ? 'pending' : requiredProperties ? 'computed' : 'notRun'} desc={t('props.rows.B.desc')} />
@@ -287,7 +279,7 @@ const PropertyTable = ({ data, filePath, requiredProperties, requiredPropertiesL
       </SectionCard>
 
       {/* ── Structural Properties ── */}
-      <SectionCard title={t('props.sections.structural')} icon="▦">
+      <SectionCard title={t('props.sections.structural')} open={false} icon="▦">
         <PropRow code="ORD" label={t('props.rows.ORD.label')} value={s.ordinary} desc={t('props.rows.ORD.desc')} />
         <PropRow code="HOM" label={t('props.rows.HOM.label')} value={s.homogeneous} desc={t('props.rows.HOM.desc')} />
         <PropRow code="CON" label={t('props.rows.CON.label')} value={s.connected} desc={t('props.rows.CON.desc')} />
@@ -311,7 +303,7 @@ const PropertyTable = ({ data, filePath, requiredProperties, requiredPropertiesL
       </SectionCard>
 
       {/* ── Structural Sub-classes ── */}
-      <SectionCard title={t('props.sections.subclasses')} icon="⊕">
+      <SectionCard title={t('props.sections.subclasses')} open={false} icon="⊕">
         <StructuralSubclassRows filePath={filePath} initialProperties={s} />
       </SectionCard>
 
@@ -331,7 +323,7 @@ const PropertyTable = ({ data, filePath, requiredProperties, requiredPropertiesL
       </SectionCard>
 
       {/* ── Analysis Info ── */}
-      <SectionCard title={t('props.sections.info')} icon="ⓘ">
+      <SectionCard title={t('props.sections.info')} open={false} icon="ⓘ">
         <PropRow label={t('props.info.states')} value={data.analysis_info?.num_states ?? t('common.na')} />
         <PropRow label={t('props.info.duration')} value={
           data.analysis_info?.duration_ms != null
