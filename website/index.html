@@ -3,103 +3,132 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#e9efeb" />
-    <meta name="description" content="RACoN is a desktop Petri net analyzer for structural analysis, reachability, coverability, and CTL verification." />
-    <title>RACoN — Petri net analysis, made visible</title>
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="SPECTRA is a desktop workbench for Petri nets: structural analysis, invariants, reachability, coverability and CTL model checking." />
+    <title>SPECTRA — Petri net analysis</title>
     <link rel="icon" type="image/png" href="./favicon.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
     <script src="site.js" defer></script>
   </head>
   <body>
+    <a class="skip" href="#main" data-i18n="nav.skip">Skip to content</a>
     <header class="topbar">
-      <a class="brand" href="#top" aria-label="RACoN home">
-        <img class="brand-logo" src="./logo.png" alt="" aria-hidden="true" height="26" style="height:26px;width:auto">
-        <span>RACoN</span>
+      <a class="brand" href="#top" aria-label="SPECTRA">
+        <img src="./logo.png" alt="" width="22" height="26" />
+        <span>SPECTRA</span>
       </a>
-      <nav aria-label="Main navigation" data-i18n-aria="nav.label">
-        <a href="#about" data-i18n="nav.about">About</a>
+      <nav aria-label="Main" data-i18n-aria="nav.label">
+        <a href="#features" data-i18n="nav.features">Features</a>
         <a href="#workflow" data-i18n="nav.workflow">How it works</a>
-        <a href="#downloads" data-i18n="nav.downloads">Downloads</a>
+        <a href="#downloads" data-i18n="nav.downloads">Download</a>
       </nav>
-      <div class="top-actions">
-        <button class="language" id="language-toggle" type="button" aria-label="Switch to Portuguese">PT <span>⌄</span></button>
-        <a class="top-download" href="#downloads" data-i18n="nav.cta">Get RACoN <span aria-hidden="true">↗</span></a>
-      </div>
+      <button class="lang" id="language-toggle" type="button" aria-label="Mudar para português">PT</button>
     </header>
 
-    <main id="top">
-      <section class="hero wrap" aria-labelledby="hero-title">
+    <main id="main">
+      <section class="hero wrap" id="top" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span class="eyebrow-dot"></span><span data-i18n="hero.eyebrow">A desktop workbench for Petri nets</span></p>
-          <h1 id="hero-title" data-i18n="hero.title">See how your<br /><em>systems can move.</em></h1>
-          <p class="hero-lede" data-i18n="hero.lede">RACoN turns Petri net models into something you can inspect, explore, and verify — from the first token to the full state space.</p>
-          <div class="hero-actions">
-            <a class="button button-dark" href="#downloads"><span data-i18n="hero.cta">Download RACoN</span><span aria-hidden="true">↓</span></a>
-            <a class="text-link" href="#workflow"><span data-i18n="hero.secondary">See how to use it</span><span aria-hidden="true">↘</span></a>
+          <h1 id="hero-title" data-i18n="hero.title">See what your Petri net can do.</h1>
+          <p class="lede" data-i18n="hero.lede">SPECTRA is a desktop workbench for Petri nets. Check structure and invariants, build the state space, verify CTL properties, and step through the model token by token.</p>
+          <div class="actions">
+            <a class="button primary" href="#downloads" data-i18n="hero.cta">Download SPECTRA</a>
+            <a class="button" href="https://github.com/Matheusouza2/spectra" data-i18n="hero.source">View source</a>
           </div>
-          <div class="hero-meta"><span class="meta-rule"></span><span data-i18n="hero.meta">Free · Desktop · Windows, Linux &amp; macOS</span></div>
+          <p class="fine" data-i18n="hero.fine">Free and open source · Windows, Linux and macOS</p>
         </div>
-        <div class="net-card" aria-label="Illustration of a Petri net with places, transitions, and token flow" data-i18n-aria="hero.diagramAlt">
-          <div class="net-card-head"><span data-i18n="diagram.title">PETRI NET / LIVE MODEL</span><span class="live-indicator"><i></i><span data-i18n="diagram.status">READY</span></span></div>
-          <svg class="net-diagram" viewBox="0 0 620 350" role="img" aria-labelledby="net-title net-desc">
-            <title id="net-title">A small Petri net</title>
-            <desc id="net-desc">Four places connected by three transitions, with tokens shown as amber dots.</desc>
-            <defs><pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M 28 0 L 0 0 0 28" fill="none" stroke="#d9e3df" stroke-width="1" /></pattern><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#68858a" /></marker></defs>
-            <rect width="620" height="350" fill="url(#grid)" />
-            <g class="net-lines" fill="none" stroke="#68858a" stroke-width="2" marker-end="url(#arrow)">
-              <path d="M115 176 H203"/><path d="M245 176 H325"/><path d="M365 176 H453"/><path d="M495 176 H553"/>
-              <path d="M345 196 C345 273 153 273 153 196"/>
-            </g>
-            <g class="transition"><rect x="204" y="149" width="42" height="54" rx="3"/><rect x="324" y="149" width="42" height="54" rx="3"/><rect x="453" y="149" width="42" height="54" rx="3"/></g>
-            <g class="place"><circle cx="92" cy="176" r="24"/><circle cx="345" cy="176" r="24"/><circle cx="575" cy="176" r="24"/><circle cx="153" cy="290" r="24"/></g>
-            <g class="tokens"><circle cx="84" cy="176" r="4.5"/><circle cx="98" cy="176" r="4.5"/><circle cx="345" cy="176" r="4.5"/><circle cx="575" cy="176" r="4.5"/></g>
-            <g class="net-label"><text x="92" y="225">P₀ · INPUT</text><text x="225" y="132">T₀</text><text x="345" y="225">P₁ · BUFFER</text><text x="345" y="132">T₁</text><text x="474" y="132">T₂</text><text x="575" y="225">P₂ · OUTPUT</text><text x="153" y="337">P₃ · FEEDBACK</text></g>
-            <g class="diagram-tag"><rect x="24" y="24" width="151" height="29" rx="14"/><text x="39" y="43" data-i18n="diagram.tag">INITIAL MARKING  M₀</text></g>
-          </svg>
-          <div class="net-card-foot"><span><i class="legend-place"></i><span data-i18n="diagram.places">Places</span></span><span><i class="legend-transition"></i><span data-i18n="diagram.transitions">Transitions</span></span><span><i class="legend-token"></i><span data-i18n="diagram.tokens">Tokens</span></span><span class="diagram-foot-note" data-i18n="diagram.caption">A model is the beginning of the story.</span></div>
-        </div>
-      </section>
 
-      <section class="ticker" aria-label="RACoN capabilities">
-        <div class="ticker-inner"><span data-i18n="ticker.one">STRUCTURAL PROPERTIES</span><b>✳</b><span data-i18n="ticker.two">STATE SPACE</span><b>✳</b><span data-i18n="ticker.three">CTL MODEL CHECKING</span><b>✳</b><span data-i18n="ticker.four">TOKEN GAME</span><b>✳</b><span data-i18n="ticker.five">COVERABILITY</span></div>
-      </section>
+        <div class="instrument" id="instrument">
+          <div class="inst-bar">
+            <span class="inst-tabs" aria-hidden="true">
+              <span data-i18n="tab.analysis">Analysis</span><span data-i18n="tab.graphs">Graphs</span><span data-i18n="tab.invariants">Invariants</span><span>CTL</span><span class="on">Token Game</span>
+            </span>
+          </div>
+          <div class="inst-body">
+            <svg class="net" viewBox="0 0 680 350" role="group" aria-labelledby="net-title net-desc">
+              <title id="net-title" data-i18n="net.title">Mutual exclusion net</title>
+              <desc id="net-desc" data-i18n="net.desc">Two processes share one lock. Fire a highlighted transition to move tokens.</desc>
+              <defs>
+                <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><path class="arrowhead" d="M0,0.5 L9,4.5 L0,8.5 z" /></marker>
+              </defs>
+              <g class="arcs" fill="none" marker-end="url(#arrow)">
+                <path d="M116 110 H205" /><path d="M225 110 H314" /><path d="M366 110 H455" /><path d="M475 110 H554" />
+                <path d="M580 136 V240" /><path d="M554 250 H492" /><path d="M465 224 V136" />
+                <path d="M580 260 V320 H90 V137" />
+              </g>
+              <g class="node place" data-place="idle" transform="translate(90 110)"><circle r="26" /><g class="tokens"></g><text class="lbl" y="-38" data-i18n="p.idle">Idle</text></g>
+              <g class="node place" data-place="wait" transform="translate(340 110)"><circle r="26" /><g class="tokens"></g><text class="lbl" y="-38" data-i18n="p.wait">Waiting</text></g>
+              <g class="node place" data-place="crit" transform="translate(580 110)"><circle r="26" /><g class="tokens"></g><text class="lbl" y="-38" data-i18n="p.crit">Critical</text></g>
+              <g class="node place" data-place="lock" transform="translate(465 250)"><circle r="26" /><g class="tokens"></g><text class="lbl" y="46" data-i18n="p.lock">Lock</text></g>
+              <g class="node trans" data-trans="req" transform="translate(215 110)" tabindex="0" role="button"><rect class="halo" x="-14" y="-31" width="28" height="62" rx="5" /><rect class="bar" x="-9" y="-25" width="18" height="50" rx="2" /><text class="lbl" y="-42" data-i18n="t.req">request</text></g>
+              <g class="node trans" data-trans="enter" transform="translate(465 110)" tabindex="0" role="button"><rect class="halo" x="-14" y="-31" width="28" height="62" rx="5" /><rect class="bar" x="-9" y="-25" width="18" height="50" rx="2" /><text class="lbl" y="-42" data-i18n="t.enter">enter</text></g>
+              <g class="node trans" data-trans="leave" transform="translate(580 250)" tabindex="0" role="button"><rect class="halo" x="-31" y="-14" width="62" height="28" rx="5" /><rect class="bar" x="-25" y="-9" width="50" height="18" rx="2" /><text class="lbl side" x="40" y="4" data-i18n="t.leave">leave</text></g>
+            </svg>
 
-      <section class="about-section wrap" id="about">
-        <div class="section-intro"><p class="eyebrow"><span class="eyebrow-index">01</span><span data-i18n="about.kicker">A model you can question</span></p><h2 data-i18n="about.title">From formal model<br />to <em>clear answers.</em></h2></div>
-        <div class="about-copy"><p data-i18n="about.body">Petri nets describe systems where events compete for resources, happen in parallel, or wait on one another. RACoN gives students, researchers, and engineers a practical way to reason about those systems: load a model, inspect its structure, explore possible states, and check whether the behavior meets a formal property.</p><p class="about-note" data-i18n="about.note">Built for discrete-event systems, workflows, protocols, and any process where “what can happen next?” matters.</p></div>
-      </section>
-
-      <section class="capabilities wrap" aria-label="Analysis tools">
-        <article class="capability"><span class="cap-icon icon-structure" aria-hidden="true"><i></i><i></i><i></i><b></b></span><p class="cap-label" data-i18n="cap.one.label">UNDERSTAND</p><h3 data-i18n="cap.one.title">Read the structure</h3><p data-i18n="cap.one.body">Inspect places, transitions, arcs, incidence matrices, structural properties, and invariants.</p></article>
-        <article class="capability capability-featured"><span class="cap-icon icon-states" aria-hidden="true"><i></i><i></i><i></i><b></b><b></b></span><p class="cap-label" data-i18n="cap.two.label">EXPLORE</p><h3 data-i18n="cap.two.title">Trace what can happen</h3><p data-i18n="cap.two.body">Build reachability graphs or coverability results, then follow paths and inspect markings.</p></article>
-        <article class="capability"><span class="cap-icon icon-check" aria-hidden="true"><i></i><i></i><b>✓</b></span><p class="cap-label" data-i18n="cap.three.label">VERIFY</p><h3 data-i18n="cap.three.title">Check a property</h3><p data-i18n="cap.three.body">Evaluate CTL formulas and bad-state queries, with witnesses or counterexamples when available.</p></article>
-      </section>
-
-      <section class="workflow-section" id="workflow">
-        <div class="wrap workflow-wrap"><div class="workflow-heading"><p class="eyebrow"><span class="eyebrow-index">02</span><span data-i18n="workflow.kicker">A practical workflow</span></p><h2 data-i18n="workflow.title">Bring a model.<br /><em>Follow the behavior.</em></h2><p data-i18n="workflow.intro">RACoN keeps the path from input to result visible and interactive.</p></div>
-          <div class="steps">
-            <article class="step"><span class="step-mark">A</span><div><h3 data-i18n="workflow.step1.title">Load your net</h3><p data-i18n="workflow.step1.body">Open an INA/PNT `.pnt` file or paste a compatible Mercury script. RACoN validates the model before analysis.</p></div><span class="step-arrow" aria-hidden="true">↘</span></article>
-            <article class="step"><span class="step-mark">B</span><div><h3 data-i18n="workflow.step2.title">Choose a question</h3><p data-i18n="workflow.step2.body">Start with structural properties, calculate invariants, generate a state space, or define a CTL or bad-state check.</p></div><span class="step-arrow" aria-hidden="true">↘</span></article>
-            <article class="step"><span class="step-mark">C</span><div><h3 data-i18n="workflow.step3.title">Explore the result</h3><p data-i18n="workflow.step3.body">Inspect graphs, markings, paths, evidence, and algorithm limits. Use the token game to step through enabled transitions.</p></div><span class="step-arrow" aria-hidden="true">✓</span></article>
+            <dl class="readout" aria-live="polite">
+              <div><dt data-i18n="r.marking">Marking</dt><dd class="mono" id="r-marking">(2, 0, 0, 1)</dd><dd class="cap" data-i18n="r.order">Idle, Waiting, Critical, Lock</dd></div>
+              <div><dt data-i18n="r.visited">Markings visited</dt><dd class="mono" id="r-visited">1 / 5</dd></div>
+              <div class="inv"><dt data-i18n="r.invariants">P-invariants</dt>
+                <dd class="mono"><span id="r-inv1">2</span> = <span class="sum" data-i18n="r.inv1">Idle + Waiting + Critical</span></dd>
+                <dd class="mono"><span id="r-inv2">1</span> = <span class="sum" data-i18n="r.inv2">Critical + Lock</span></dd></div>
+              <div class="verdict"><dt data-i18n="r.property">Property</dt><dd id="r-prop"></dd></div>
+            </dl>
+          </div>
+          <div class="inst-foot">
+            <span class="hint" id="hint" data-i18n="net.hint">Click a highlighted transition to fire it.</span>
+            <span class="inst-actions"><button type="button" id="auto" aria-pressed="false" data-i18n="net.auto">Auto-play</button><button type="button" id="reset" data-i18n="net.reset">Reset</button></span>
           </div>
         </div>
       </section>
 
-      <section class="downloads wrap" id="downloads">
-        <div class="download-heading"><p class="eyebrow"><span class="eyebrow-index">03</span><span data-i18n="download.kicker">Choose your platform</span></p><h2 data-i18n="download.title">Take the workbench<br /><em>to your desktop.</em></h2><p data-i18n="download.intro">The latest builds are created from the `main` branch. Pick your system to download its installer.</p><a class="release-link" href="https://github.com/Matheusouza2/spectra/releases/latest" data-i18n="download.all">View all files in the latest release ↗</a></div>
-        <div class="download-options">
-          <article class="download-card" data-platform="windows"><div class="platform-symbol windows-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="platform-text"><h3>Windows</h3><p data-i18n="download.windows">Windows 10 or later · 64-bit</p></div><a class="download-button" href="https://github.com/Matheusouza2/spectra/releases/latest" data-fallback="https://github.com/Matheusouza2/spectra/releases/latest"><span data-i18n="download.button">Download</span><span class="file-kind">.MSI</span><span class="download-arrow" aria-hidden="true">↓</span></a></article>
-          <article class="download-card" data-platform="linux"><div class="platform-symbol linux-symbol" aria-hidden="true"><i></i><b></b></div><div class="platform-text"><h3>Linux</h3><p data-i18n="download.linux">Ubuntu / Debian · 64-bit</p></div><a class="download-button" href="https://github.com/Matheusouza2/spectra/releases/latest" data-fallback="https://github.com/Matheusouza2/spectra/releases/latest"><span data-i18n="download.button">Download</span><span class="file-kind">.DEB</span><span class="download-arrow" aria-hidden="true">↓</span></a></article>
-          <article class="download-card" data-platform="macos"><div class="platform-symbol apple-symbol" aria-hidden="true">◒</div><div class="platform-text"><h3>macOS</h3><p data-i18n="download.macos">macOS · Disk image</p></div><a class="download-button" href="https://github.com/Matheusouza2/spectra/releases/latest" data-fallback="https://github.com/Matheusouza2/spectra/releases/latest"><span data-i18n="download.button">Download</span><span class="file-kind">.DMG</span><span class="download-arrow" aria-hidden="true">↓</span></a></article>
-          <p class="download-status" id="download-status" role="status" data-i18n="download.status">Checking the latest release…</p>
-          <p class="download-caution" data-i18n="download.caution">macOS packages are ad-hoc signed and not notarized. macOS may require you to allow the app under Privacy &amp; Security after installation.</p>
+      <section class="features wrap" id="features" aria-labelledby="features-title">
+        <h2 id="features-title" data-i18n="features.title">One model, every question you can ask it.</h2>
+        <ul class="feature-list">
+          <li><span class="mono name" data-i18n="f.analysis.name">Analysis</span><p data-i18n="f.analysis.body">More than 25 structural properties: boundedness, liveness, conflicts, siphons and traps, with the verdict and the reason for each.</p></li>
+          <li><span class="mono name" data-i18n="f.invariants.name">Invariants</span><p data-i18n="f.invariants.body">P- and T-invariants from the incidence matrix, so you can prove conservation laws instead of guessing them.</p></li>
+          <li><span class="mono name" data-i18n="f.graphs.name">Graphs</span><p data-i18n="f.graphs.body">Reachability graph, or a coverability tree for unbounded nets, with ω shown where the marking grows without limit.</p></li>
+          <li><span class="mono name">CTL</span><p data-i18n="f.ctl.body">Write properties in a readable formula language and get a verdict with a witness or a counterexample path.</p></li>
+          <li><span class="mono name">Token Game</span><p data-i18n="f.game.body">Fire enabled transitions one at a time and watch the marking change, exactly like the model above.</p></li>
+          <li><span class="mono name" data-i18n="f.reduce.name">Reductions</span><p data-i18n="f.reduce.body">Stubborn sets, symmetries and structural reductions keep the state space small enough to finish.</p></li>
+        </ul>
+        <p class="formats" data-i18n="formats">Opens <span class="mono">.pnt</span> files from INA and <span class="mono">Mercury</span> scripts.</p>
+      </section>
+
+      <section class="workflow" id="workflow" aria-labelledby="workflow-title">
+        <div class="wrap">
+          <h2 id="workflow-title" data-i18n="workflow.title">From a file to an answer in three steps.</h2>
+          <ol class="steps">
+            <li><span class="dot" aria-hidden="true">1</span><h3 data-i18n="s1.title">Open your net</h3><p data-i18n="s1.body">Load a <span class="mono">.pnt</span> file or paste a Mercury script. SPECTRA validates the model before anything runs.</p></li>
+            <li><span class="dot" aria-hidden="true">2</span><h3 data-i18n="s2.title">Ask a question</h3><p data-i18n="s2.body">Pick a structural check, compute invariants, build the state space, or write a CTL formula.</p></li>
+            <li><span class="dot" aria-hidden="true">3</span><h3 data-i18n="s3.title">Read the evidence</h3><p data-i18n="s3.body">Inspect graphs, markings and paths, and replay any trace in the token game.</p></li>
+          </ol>
         </div>
       </section>
 
-      <section class="closing wrap"><div class="closing-mark" aria-hidden="true">R</div><p data-i18n="closing.line">A model is a question. RACoN helps you follow the answer.</p><a href="#downloads" class="closing-link" data-i18n="closing.cta">Find your download ↓</a></section>
+      <section class="downloads wrap" id="downloads" aria-labelledby="downloads-title">
+        <div class="dl-head">
+          <h2 id="downloads-title" data-i18n="dl.title">Download SPECTRA</h2>
+          <p id="download-status" class="status" role="status" data-state="checking"></p>
+        </div>
+        <ul class="dl-list">
+          <li data-platform="windows"><div><h3>Windows</h3><p data-i18n="dl.windows">Windows 10 or later, 64-bit</p></div><span class="badge" hidden data-i18n="dl.yours">Your system</span><a class="button" href="https://github.com/Matheusouza2/spectra/releases/latest"><span data-i18n="dl.button">Download</span> <span class="mono file-kind">.msi</span></a></li>
+          <li data-platform="macos"><div><h3>macOS</h3><p data-i18n="dl.macos">Apple Silicon, disk image</p></div><span class="badge" hidden data-i18n="dl.yours">Your system</span><a class="button" href="https://github.com/Matheusouza2/spectra/releases/latest"><span data-i18n="dl.button">Download</span> <span class="mono file-kind">.dmg</span></a></li>
+          <li data-platform="linux"><div><h3>Linux</h3><p data-i18n="dl.linux">Debian and Ubuntu, or any distro with AppImage</p></div><span class="badge" hidden data-i18n="dl.yours">Your system</span><a class="button" href="https://github.com/Matheusouza2/spectra/releases/latest"><span data-i18n="dl.button">Download</span> <span class="mono file-kind">.deb</span></a></li>
+        </ul>
+        <p class="caution" data-i18n="dl.caution">The installers are not code-signed yet. Windows SmartScreen may warn you on first run, and on macOS you may need to allow the app under Privacy &amp; Security.</p>
+        <a class="all" href="https://github.com/Matheusouza2/spectra/releases/latest" data-i18n="dl.all">All files in the latest release</a>
+      </section>
     </main>
 
-    <footer class="footer"><div class="wrap footer-inner"><span class="footer-brand">RACoN <span>REACHABILITY AND COVERABILITY NET ANALYZER</span></span><div><a href="https://github.com/Matheusouza2/spectra" data-i18n="footer.source">Source code</a><a href="https://github.com/Matheusouza2/spectra/issues" data-i18n="footer.issues">Report an issue</a></div><span class="footer-copy">© <span id="year"></span> RACoN</span></div></footer>
+    <footer class="footer">
+      <div class="wrap footer-inner">
+        <span><b>SPECTRA</b> <span data-i18n="footer.name">Reachability And Coverability Net Analyzer</span></span>
+        <span><a href="https://github.com/Matheusouza2/spectra" data-i18n="footer.source">Source code</a><a href="https://github.com/Matheusouza2/spectra/issues" data-i18n="footer.issues">Report an issue</a></span>
+        <span>AGPL-3.0-or-later</span>
+      </div>
+    </footer>
   </body>
 </html>

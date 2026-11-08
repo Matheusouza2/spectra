@@ -1,6 +1,6 @@
 cff-version: 1.2.0
-message: "If you use RACoN in your research, please cite it using the metadata below, and cite the associated dissertation or article when available."
-title: "RACoN: Reachability And Coverability Net Analyzer"
+message: "If you use SPECTRA in your research, please cite it using the metadata below, and cite the associated dissertation or article when available."
+title: "SPECTRA: Reachability And Coverability Net Analyzer"
 type: software
 authors:
   - family-names: "Souza"
@@ -9,7 +9,7 @@ authors:
 license: AGPL-3.0-or-later
 version: "0.1.0"
 # TODO: fill in once available.
-# repository-code: "https://github.com/<user>/racon"
+repository-code: "https://github.com/Matheusouza2/spectra"
 # date-released: "YYYY-MM-DD"
 # preferred-citation:
 #   type: thesis            # use "article" for a paper
@@ -21,3 +21,30 @@ version: "0.1.0"
 #     name: "<university>"
 #   year: YYYY
 #   # doi / url: ...
+references:
+  - type: conference-paper
+    title: "Mercury 6.1: a Unified Platform for Stochastic Modeling, Analysis, and Decision Support"
+    authors:
+      - family-names: "Pinheiro"
+        given-names: "Thiago"
+      - family-names: "Almeida"
+        given-names: "Vinicius"
+      - family-names: "Santana"
+        given-names: "Marcelo"
+      - family-names: "Silva"
+        given-names: "Jonatas"
+      - family-names: "Mialaret"
+        given-names: "Marco"
+      - family-names: "Maciel"
+        given-names: "Paulo"
+    collection-title: "2025 IEEE 36th International Symposium on Software Reliability Engineering Workshops (ISSREW)"
+    publisher:
+      name: "IEEE Computer Society"
+      city: "Los Alamitos"
+      country: "US"
+    year: 2025
+    month: 10
+    start: 57
+    end: 62
+    doi: "10.1109/ISSREW67781.2025.00046"
+    url: "https://doi.ieeecomputersociety.org/10.1109/ISSREW67781.2025.00046"

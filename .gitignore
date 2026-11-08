@@ -69,3 +69,36 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+/Apresentação/
+/.opencode/
+
+# Agent tooling state and dependencies (any depth)
+.opencode/
+.claude/
+.cursor/
+.aider*
+
+# Local build caches and tool output
+*.tsbuildinfo
+.vite/
+.eslintcache
+coverage/
+/src-tauri/gen/
+npm-debug.log*
+yarn-error.log*
+
+# Java build output
+*.class
+*.jar
+
+# Generated installers and packages (built by GitHub Actions)
+*.msi
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+
+# Local analysis/model scratch files
+*.rcn
+*.racon
